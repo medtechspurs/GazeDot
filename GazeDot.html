@@ -3,280 +3,530 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Gaze Dot v0.2</title>
+<title>Chopper Run v0.3</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
-    touch-action: none; }
+    touch-action: none; -webkit-touch-callout: none; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   /* Keep the video rendered (not display:none) so iOS keeps decoding frames. */
-  video { position: fixed; top: calc(env(safe-area-inset-top) + 8px); right: 8px; width: 72px;
-    border-radius: 8px; transform: scaleX(-1); opacity: 0.01; pointer-events: none; }
-  video.show { opacity: 0.6; }
+  video { position: fixed; top: calc(env(safe-area-inset-top) + 44px); left: 8px; width: 64px;
+    border-radius: 8px; transform: scaleX(-1); opacity: 0.01; pointer-events: none; z-index: 2; }
+  video.gd-show { opacity: 0.6; }
   #gd-start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 14px; padding: 24px; text-align: center; background: #0b0d12; z-index: 5; }
-  #gd-start h1 { margin: 0; font-size: 34px; letter-spacing: 0.5px; }
+    justify-content: center; gap: 13px; padding: 24px; text-align: center; background: #0b0d12; z-index: 9; }
+  #gd-start h1 { margin: 0; font-size: 36px; letter-spacing: 0.5px; }
   #gd-ver { font-size: 15px; color: #7fd4ff; font-weight: 600; }
-  #gd-start p { margin: 0; max-width: 320px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
+  #gd-start p { margin: 0; max-width: 330px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
   button { font: inherit; color: #0b0d12; background: #7fd4ff; border: 0; border-radius: 12px;
     padding: 12px 18px; font-weight: 600; }
   #gd-go { font-size: 19px; padding: 16px 34px; }
-  #gd-status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 320px; }
-  #gd-hud { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
-    display: none; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; z-index: 3; padding: 0 8px; }
-  #gd-hud button { background: #1d2330; color: #e8ecf4; font-size: 13px; padding: 9px 12px; }
-  #gd-hud label { font-size: 12px; color: #aab3c5; display: flex; align-items: center; gap: 6px; }
-  #gd-hud input { width: 90px; }
-  #gd-dbg { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
-    color: #9fe8a8; white-space: pre; display: none; z-index: 3; pointer-events: none; }
-  #gd-tag { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 2px); right: 8px; font-size: 10px; color: #56607a; z-index: 3; }
+  #gd-touch { background: transparent; color: #7fd4ff; font-size: 14px; font-weight: 500; padding: 6px 10px; }
+  #gd-status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 330px; }
+  #gd-score { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 0; right: 0; text-align: center;
+    font-size: 17px; font-weight: 700; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none;
+    font-variant-numeric: tabular-nums; }
+  #gd-gear { position: fixed; top: calc(env(safe-area-inset-top) + 4px); right: 6px; z-index: 5; display: none;
+    background: rgba(20,24,34,0.6); color: #e8ecf4; padding: 8px 12px; font-size: 18px; }
+  #gd-panel { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
+    display: none; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; z-index: 5; padding: 0 8px; }
+  #gd-panel button { background: rgba(29,35,48,0.92); color: #e8ecf4; font-size: 13px; padding: 10px 12px; }
+  #gd-panel label { font-size: 12px; color: #e8ecf4; display: flex; align-items: center; gap: 6px;
+    background: rgba(29,35,48,0.92); border-radius: 12px; padding: 6px 10px; }
+  #gd-panel input { width: 90px; }
+  #gd-msg { position: fixed; left: 0; right: 0; top: 30%; text-align: center; z-index: 4; pointer-events: none;
+    font-size: 22px; font-weight: 700; text-shadow: 0 2px 10px #000; padding: 0 20px; display: none; }
+  #gd-msg small { display: block; font-size: 14px; font-weight: 500; color: #cfd6e6; margin-top: 8px; }
+  #gd-bar { width: 180px; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; margin: 14px auto 0; overflow: hidden; }
+  #gd-barfill { height: 100%; width: 0%; background: #7fd4ff; }
+  #gd-debug { position: fixed; top: calc(env(safe-area-inset-top) + 140px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
+    color: #9fe8a8; white-space: pre; display: none; z-index: 4; pointer-events: none; text-shadow: 0 1px 3px #000; }
+  #gd-tag { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 2px); right: 8px; font-size: 10px; color: #8a93ab; z-index: 4;
+    text-shadow: 0 1px 3px #000; pointer-events: none; }
 </style>
 </head>
 <body>
-<canvas id="gd-c"></canvas>
-<video id="gd-v" playsinline muted autoplay></video>
+<canvas id="gd-canvas"></canvas>
+<video id="gd-video" playsinline muted autoplay></video>
 
 <div id="gd-start">
-  <h1>Gaze Dot</h1>
-  <div id="gd-ver">v0.2</div>
-  <p>Tracking test for the look-to-steer racer. Uses the front camera; nothing leaves your phone.</p>
-  <p>Hold the phone the way you'd play, in decent light. You'll follow a dot to five spots to calibrate.</p>
+  <h1>Chopper Run</h1>
+  <div id="gd-ver">v0.3</div>
+  <p>Fly a helicopter through the city with your head. Turn or tilt to bank, chin up to climb, chin down to dive.</p>
+  <p>Fly through the gold rings. Hitting things just bounces you. Uses the front camera; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
+  <button id="gd-touch">Play with touch instead</button>
   <div id="gd-status"></div>
 </div>
 
-<div id="gd-hud">
+<div id="gd-score"></div>
+<button id="gd-gear">⚙</button>
+<div id="gd-panel">
+  <button id="gd-recenter">Recenter</button>
+  <button id="gd-steer">Steer: Both</button>
+  <button id="gd-feel">Feel: Fly</button>
+  <label>Sens <input id="gd-sens" type="range" min="0.5" max="2.2" step="0.05" value="1"></label>
   <button id="gd-recal">Recalibrate</button>
-  <button id="gd-mode">Mode: Both</button>
-  <label>Smooth <input id="gd-smooth" type="range" min="0.02" max="0.5" step="0.01" value="0.12"></label>
-  <button id="gd-dbgBtn">Debug</button>
-  <button id="gd-deleg">GPU</button>
+  <button id="gd-dbgbtn">Debug</button>
 </div>
-<div id="gd-dbg"></div>
-<div id="gd-tag">v0.2</div>
+<div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
+<div id="gd-debug"></div>
+<div id="gd-tag">v0.3</div>
 
 <script type="module">
-const VERSION = "0.2";
+const VERSION = "0.3";
+const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+const FAKE = new URLSearchParams(location.search).has("fake");   // test hook: head mode without a camera
 
 const $ = id => document.getElementById(id);
-const canvas = $("gd-c"), ctx = canvas.getContext("2d"), video = $("gd-v");
-const statusEl = $("gd-status"), dbgEl = $("gd-dbg");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const video = $("gd-video"), statusEl = $("gd-status");
 
-let vision = null, fileset = null, landmarker = null, delegate = "GPU";
-let state = "idle";            // idle | calibrating | run
-let mode = "both";             // both | eyes | head
-let tau = 0.12, showDbg = false;
-let W = 0, H = 0, dpr = 1;
-let feat = null, faceSeen = false, lastVideoTime = -1;
+let THREE = null, renderer, scene, camera;
+let landmarker = null, delegate = "GPU";
+let inputMode = "head";          // head | touch
+let state = "menu";              // menu | cal | play
+let steerMode = "both";          // both | turn | tilt
+let feel = "fly";                // fly | direct
+let sens = 1, showDbg = false;
+let W = 0, H = 0;
+
+/* ---------------- head tracking ---------------- */
+let raw = null, pose = null, faceSeen = false, lastSeenAt = 0, lastVideoTime = -1, fakePose = null;
 let fps = 0, inferMs = 0, lastInferAt = 0;
-let dot = { x: 0, y: 0 }, lastFrame = performance.now();
-let cal = null, calStep = 0, calT0 = 0, calSum = null, calN = 0, calTmp = {};
+let neutral = { yaw: 0, pitch: 0, roll: 0 };
+// Which way each angle runs. These defaults are a best guess; calibration overrides them.
+let signs = { yaw: -1, roll: 1, pitch: -1 };
+let haveSigns = false;
+try { const s = JSON.parse(localStorage.getItem("gd-signs") || "null"); if (s && s.yaw && s.roll && s.pitch) { signs = s; haveSigns = true; } } catch (e) {}
 
-const STEPS = [
-  { key: "c", x: 0,  y: 0,  label: "Look at the dot" },
-  { key: "l", x: -1, y: 0,  label: "Left" },
-  { key: "r", x: 1,  y: 0,  label: "Right" },
-  { key: "u", x: 0,  y: -1, label: "Up" },
-  { key: "d", x: 0,  y: 1,  label: "Down" },
+function readPose(res) {
+  const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
+  if (!m) return null;
+  // column-major 4x4. Forward axis = m[8..10]; side axis = m[0..2]; up axis = m[4..6].
+  return { yaw: Math.atan2(m[8], m[10]), pitch: Math.asin(clamp(-m[9], -1, 1)), roll: Math.atan2(m[1], m[5]) };
+}
+function infer(now) {
+  let p = null;
+  if (FAKE) { p = fakePose; }
+  else {
+    if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+    lastVideoTime = video.currentTime;
+    const t0 = performance.now();
+    let res;
+    try { res = landmarker.detectForVideo(video, now); } catch (e) { return; }
+    inferMs += (performance.now() - t0 - inferMs) * 0.1;
+    if (lastInferAt) fps += (1000 / Math.max(1, now - lastInferAt) - fps) * 0.1;
+    lastInferAt = now;
+    p = readPose(res);
+  }
+  faceSeen = !!p;
+  if (!p) return;
+  lastSeenAt = now;
+  raw = p;
+  if (!pose) pose = { ...p };
+  else { const k = 0.45; pose.yaw += (p.yaw - pose.yaw) * k; pose.pitch += (p.pitch - pose.pitch) * k; pose.roll += (p.roll - pose.roll) * k; }
+}
+const dz = v => { const a = Math.abs(v), d = 0.08; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
+let parts = { t: 0, r: 0, p: 0 };
+function headInput(now) {
+  if (!pose || now - lastSeenAt > 500) return { sx: 0, sy: 0 };
+  const t = signs.yaw * (pose.yaw - neutral.yaw) / 0.24 * sens;      // about 14 degrees of turn = full bank
+  const r = signs.roll * (pose.roll - neutral.roll) / 0.24 * sens;   // about 14 degrees of tilt = full bank
+  const p = signs.pitch * (pose.pitch - neutral.pitch) / 0.16 * sens; // about 9 degrees of nod = full climb
+  parts = { t, r, p };
+  const s = steerMode === "turn" ? t : steerMode === "tilt" ? r : t + r;
+  return { sx: clamp(dz(s), -1, 1), sy: clamp(dz(p), -1, 1) };
+}
+
+/* ---------------- touch / keyboard fallback ---------------- */
+let touchIn = { sx: 0, sy: 0 }, keys = {};
+function pointer(e) {
+  if (state !== "play" || inputMode !== "touch") return;
+  if (e.type === "pointerup" || e.type === "pointercancel") { touchIn = { sx: 0, sy: 0 }; return; }
+  if (e.buttons === 0 && e.pointerType === "mouse") return;
+  touchIn = { sx: clamp((e.clientX - W / 2) / (W * 0.35), -1, 1), sy: clamp(-(e.clientY - H / 2) / (H * 0.28), -1, 1) };
+}
+["pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(t => $("gd-canvas").addEventListener(t, pointer));
+window.addEventListener("keydown", e => { keys[e.key] = true; });
+window.addEventListener("keyup", e => { keys[e.key] = false; });
+function touchInput() {
+  const kx = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0), ky = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
+  return (kx || ky) ? { sx: kx, sy: ky } : touchIn;
+}
+
+/* ---------------- calibration ---------------- */
+const CAL_FULL = [
+  { k: "c",    text: "Look straight at the screen", sub: "Hold the phone how you'll play" },
+  { k: "turn", text: "Turn your head LEFT",          sub: "like looking at something to your left" },
+  { k: "tilt", text: "Tilt your head LEFT",          sub: "left ear toward left shoulder" },
+  { k: "up",   text: "Chin UP",                      sub: "" },
 ];
-const SETTLE = 900, SAMPLE = 1100, REACH = 0.4;   // targets sit at 40% of width/height from center
+const SETTLE = 1100, SAMPLE = 800;
+let calSteps = [], calIdx = 0, calT0 = 0, calSum = null, calN = 0, calGot = {};
+function startCal(full) {
+  calSteps = full ? CAL_FULL : [CAL_FULL[0]];
+  calIdx = 0; calGot = {}; state = "cal"; beginCalStep();
+  $("gd-msg").style.display = "block"; $("gd-bar").style.display = "block";
+}
+function beginCalStep() { calT0 = performance.now(); calSum = { yaw: 0, pitch: 0, roll: 0 }; calN = 0; }
+function stepCal(now) {
+  const s = calSteps[calIdx], t = now - calT0;
+  $("gd-msgtext").textContent = faceSeen ? s.text : "Can't see your face";
+  $("gd-msgsub").textContent = faceSeen ? s.sub : "Bring the phone up in front of you";
+  $("gd-barfill").style.width = (clamp((t - SETTLE) / SAMPLE, 0, 1) * 100) + "%";
+  if (!faceSeen) { beginCalStep(); return; }
+  if (t > SETTLE && raw) { calSum.yaw += raw.yaw; calSum.pitch += raw.pitch; calSum.roll += raw.roll; calN++; }
+  if (t > SETTLE + SAMPLE) {
+    if (calN < 3) { beginCalStep(); return; }
+    calGot[s.k] = { yaw: calSum.yaw / calN, pitch: calSum.pitch / calN, roll: calSum.roll / calN };
+    calIdx++;
+    if (calIdx < calSteps.length) { beginCalStep(); return; }
+    neutral = calGot.c;
+    if (calGot.turn) {
+      const dy = calGot.turn.yaw - neutral.yaw, dr = calGot.tilt.roll - neutral.roll, dp = calGot.up.pitch - neutral.pitch;
+      if (Math.abs(dy) > 0.05) signs.yaw = -Math.sign(dy);     // head left must steer left (negative)
+      if (Math.abs(dr) > 0.05) signs.roll = -Math.sign(dr);
+      if (Math.abs(dp) > 0.04) signs.pitch = Math.sign(dp);    // chin up must climb (positive)
+      haveSigns = true;
+      try { localStorage.setItem("gd-signs", JSON.stringify(signs)); } catch (e) {}
+    }
+    pose = raw ? { ...raw } : pose;
+    $("gd-bar").style.display = "none";
+    state = "play"; flash("GO!", "", 900);
+  }
+}
+let flashUntil = 0;
+function flash(text, sub, ms) {
+  $("gd-msgtext").textContent = text; $("gd-msgsub").textContent = sub || "";
+  $("gd-msg").style.display = "block"; flashUntil = performance.now() + ms;
+}
 
+/* ---------------- world ---------------- */
+const SH = 22;                 // half-width of the street canyon
+const XL = SH - 2.4;           // how far the chopper can go sideways
+const FLOOR = 1.6, CEIL = 38;
+const SEG = 26, NSEG = 18;
+let heli, rotor, tailRotor, heliState, speed = 0, dist = 0, rings = 0, bonks = 0, shake = 0, bumpT = 0, bumpTo = null;
+let buildings = [], dashes = [], obstacles = [], ringObjs = [], nextObsZ = 0;
+let unitBox, bldMats = [], ringGeo, ringMat, sparkGeo, sparks = [], sparkPts, sparkNext = 0;
+
+function windowTexture(lit, warm) {
+  const c = document.createElement("canvas"); c.width = 64; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#10131c"; g.fillRect(0, 0, 64, 128);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 8; x++) {
+    if (Math.random() < lit) {
+      g.fillStyle = Math.random() < warm ? "rgba(255,214,140," + rand(0.5, 1) + ")" : "rgba(150,200,255," + rand(0.4, 0.9) + ")";
+    } else g.fillStyle = "#1a2030";
+    g.fillRect(x * 8 + 2, y * 8 + 2, 4, 5);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3);
+  return t;
+}
+function buildWorld() {
+  scene = new THREE.Scene();
+  // dusk sky
+  const sc = document.createElement("canvas"); sc.width = 4; sc.height = 256;
+  const sg = sc.getContext("2d"), grad = sg.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, "#0a0f2e"); grad.addColorStop(0.45, "#3b2a66"); grad.addColorStop(0.72, "#c2557a"); grad.addColorStop(1, "#ffb36b");
+  sg.fillStyle = grad; sg.fillRect(0, 0, 4, 256);
+  const sky = new THREE.CanvasTexture(sc); sky.colorSpace = THREE.SRGBColorSpace;
+  scene.background = sky;
+  scene.fog = new THREE.Fog(0x8a4a78, 70, 430);
+  scene.add(new THREE.HemisphereLight(0xaab4ff, 0x2a1838, 1.5));
+  const sun = new THREE.DirectionalLight(0xffb37a, 1.6); sun.position.set(-0.5, 0.8, -1); scene.add(sun);
+
+  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 600);
+  unitBox = new THREE.BoxGeometry(1, 1, 1);
+
+  // ground
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 1200), new THREE.MeshLambertMaterial({ color: 0x181b26 }));
+  ground.rotation.x = -Math.PI / 2; scene.add(ground); buildWorld.ground = ground;
+  const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2e9b0 });
+  for (let i = 0; i < 28; i++) {
+    const d = new THREE.Mesh(unitBox, dashMat); d.scale.set(0.7, 0.05, 6); d.position.set(0, 0.03, 40 - i * 16);
+    scene.add(d); dashes.push(d);
+  }
+
+  // buildings
+  const tints = [0x8f9bd6, 0xb08fd0, 0x7fb0c8, 0xd09a8f, 0x9aa0b4];
+  for (let i = 0; i < 5; i++) {
+    const tex = windowTexture(rand(0.25, 0.6), rand(0.4, 0.9));
+    bldMats.push(new THREE.MeshLambertMaterial({ color: tints[i], map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.85 }));
+  }
+  for (let i = 0; i < NSEG; i++) for (const side of [-1, 1]) {
+    const m = new THREE.Mesh(unitBox, pick(bldMats)); scene.add(m);
+    const b = { m, side, z: 40 - i * SEG }; dressBuilding(b); buildings.push(b);
+  }
+
+  // helicopter (nose points toward -Z)
+  heli = new THREE.Group();
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xff5a3c, emissive: 0x401008 });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x22262f });
+  const glass = new THREE.MeshLambertMaterial({ color: 0x9fe3ff, emissive: 0x1a4a66 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), bodyMat); body.scale.set(1.05, 1.05, 1.7); heli.add(body);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.8, 14, 10), glass); nose.position.set(0, 0.12, -0.95); nose.scale.set(1, 0.9, 1); heli.add(nose);
+  const boom = new THREE.Mesh(unitBox, bodyMat); boom.scale.set(0.3, 0.3, 2.6); boom.position.set(0, 0.25, 2.6); heli.add(boom);
+  const fin = new THREE.Mesh(unitBox, bodyMat); fin.scale.set(0.12, 1.1, 0.6); fin.position.set(0, 0.7, 3.7); heli.add(fin);
+  tailRotor = new THREE.Mesh(unitBox, dark); tailRotor.scale.set(0.06, 1.3, 0.16); tailRotor.position.set(0.22, 0.7, 3.7); heli.add(tailRotor);
+  const mast = new THREE.Mesh(unitBox, dark); mast.scale.set(0.18, 0.5, 0.18); mast.position.set(0, 1.2, 0); heli.add(mast);
+  rotor = new THREE.Group(); rotor.position.set(0, 1.5, 0);
+  const bladeMat = new THREE.MeshBasicMaterial({ color: 0xdfe6f5, transparent: true, opacity: 0.75 });
+  for (let i = 0; i < 2; i++) { const bl = new THREE.Mesh(unitBox, bladeMat); bl.scale.set(6.4, 0.05, 0.3); bl.rotation.y = i * Math.PI / 2; rotor.add(bl); }
+  heli.add(rotor);
+  for (const sx of [-0.7, 0.7]) {
+    const skid = new THREE.Mesh(unitBox, dark); skid.scale.set(0.1, 0.1, 2.4); skid.position.set(sx, -1.25, 0); heli.add(skid);
+    const strut = new THREE.Mesh(unitBox, dark); strut.scale.set(0.08, 0.5, 0.08); strut.position.set(sx, -1.0, 0); heli.add(strut);
+  }
+  scene.add(heli);
+
+  ringGeo = new THREE.TorusGeometry(3.4, 0.32, 8, 28);
+  ringMat = new THREE.MeshBasicMaterial({ color: 0xffd24a });
+
+  // sparks
+  const N = 140, pos = new Float32Array(N * 3).fill(-999);
+  sparkGeo = new THREE.BufferGeometry(); sparkGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  sparkPts = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ color: 0xffd98a, size: 0.55, transparent: true, depthWrite: false }));
+  sparkPts.frustumCulled = false; scene.add(sparkPts);
+  for (let i = 0; i < N; i++) sparks.push({ life: 0, x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0 });
+
+  resetRun();
+}
+function dressBuilding(b) {
+  const w = rand(18, 34), h = rand(42, 115), d = SEG - rand(1, 5);
+  b.m.material = pick(bldMats);
+  b.m.scale.set(w, h, d); b.m.position.set(b.side * (SH + w / 2), h / 2, b.z);
+}
+function resetRun() {
+  heliState = { x: 0, y: 14, z: 0, vx: 0, vy: 0 };
+  speed = 0; dist = 0; rings = 0; bonks = 0; shake = 0; bumpT = 0;
+  for (const o of obstacles) scene.remove(o.group); obstacles = [];
+  for (const r of ringObjs) scene.remove(r.m); ringObjs = [];
+  nextObsZ = -150;
+}
+function burst(x, y, z, n) {
+  for (let i = 0; i < n; i++) {
+    const s = sparks[sparkNext]; sparkNext = (sparkNext + 1) % sparks.length;
+    s.life = rand(0.3, 0.7); s.x = x; s.y = y; s.z = z;
+    s.vx = rand(-9, 9); s.vy = rand(-3, 10); s.vz = rand(-16, 2);
+  }
+}
+function addRing(x, y, z) {
+  const m = new THREE.Mesh(ringGeo, ringMat); m.position.set(x, y, z); scene.add(m);
+  ringObjs.push({ m, x, y, z, done: false });
+}
+function spawnObstacle(z) {
+  const types = ["bridge", "tower", "halfwall", "lowwall"];
+  if (dist > 400) types.push("gate", "bridge", "tower");
+  const type = pick(types);
+  const colors = { bridge: 0x4fd1c5, tower: 0xff7eb6, halfwall: 0xb79bff, lowwall: 0xffa24a, gate: 0x7fd4ff };
+  const mat = new THREE.MeshLambertMaterial({ color: colors[type], emissive: colors[type], emissiveIntensity: 0.25, transparent: true });
+  const o = { group: new THREE.Group(), boxes: [], z, depth: 7, hit: false, mat, safe: { x: 0, y: 14 } };
+  const box = (x0, x1, y0, y1) => {
+    const m = new THREE.Mesh(unitBox, mat);
+    m.scale.set(x1 - x0, y1 - y0, o.depth); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
+    o.group.add(m); o.boxes.push({ x0, x1, y0, y1 });
+  };
+  if (type === "bridge") {             // beam across the street: go under or over
+    const h = rand(10, 21);
+    box(-SH, SH, h, h + 4); box(-SH, -SH + 4, 0, h); box(SH - 4, SH, 0, h);
+    o.safe = h >= 13 ? { x: rand(-9, 9), y: h * 0.5 } : { x: rand(-9, 9), y: h + 10 };
+  } else if (type === "tower") {       // column: go around
+    const cx = pick([-10, 0, 10]) + rand(-2, 2);
+    o.depth = 10; box(cx - 6, cx + 6, 0, 70);
+    o.safe = { x: cx > 2 ? cx - 14 : cx < -2 ? cx + 14 : pick([-14, 14]), y: rand(8, 22) };
+  } else if (type === "halfwall") {    // blocks one side of the street
+    const side = pick([-1, 1]);
+    if (side < 0) box(-SH, 3, 0, 70); else box(-3, SH, 0, 70);
+    o.safe = { x: -side * 12, y: rand(8, 22) };
+  } else if (type === "lowwall") {     // elevated track: go over
+    const h = rand(8, 14);
+    box(-SH, SH, 0, h);
+    o.safe = { x: rand(-10, 10), y: h + 8 };
+  } else {                             // gate: thread the opening
+    const ox = rand(-9, 9), oy = rand(9, 22), hw = 10, hh = 6.5;
+    box(-SH, ox - hw, 0, 46); box(ox + hw, SH, 0, 46); box(ox - hw, ox + hw, 0, oy - hh); box(ox - hw, ox + hw, oy + hh, 46);
+    o.safe = { x: ox, y: oy };
+  }
+  o.safe.x = clamp(o.safe.x, -XL + 2, XL - 2); o.safe.y = clamp(o.safe.y, FLOOR + 2.5, CEIL - 3);
+  scene.add(o.group); obstacles.push(o);
+  if (type === "gate" || Math.random() < 0.7) addRing(o.safe.x, o.safe.y, z);   // the ring shows the way through
+}
+function bonk(o) {
+  o.hit = true; o.mat.opacity = 0.28; bonks++;
+  speed *= 0.45; shake = 1; bumpT = 0.4; bumpTo = o ? o.safe : null;
+  burst(heliState.x, heliState.y, heliState.z - 1.5, 36);
+  if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) {} }
+}
+function update(dt, inp) {
+  const hs = heliState;
+  const target = 38 + Math.min(1, dist / 1800) * 44;
+  speed += (target - speed) * (1 - Math.exp(-dt / 1.1));
+  hs.z -= speed * dt; dist += speed * dt;
+
+  if (feel === "fly") {
+    const k = 1 - Math.exp(-dt / 0.14);
+    hs.vx += (inp.sx * 27 - hs.vx) * k; hs.vy += (inp.sy * 18 - hs.vy) * k;
+  } else {
+    hs.vx = clamp((inp.sx * XL - hs.x) * 6, -45, 45);
+    hs.vy = clamp((16 + inp.sy * 15 - hs.y) * 6, -35, 35);
+  }
+  hs.x += hs.vx * dt; hs.y += hs.vy * dt;
+  if (bumpT > 0 && bumpTo) {            // after a bonk, get shoved toward the opening
+    bumpT -= dt; const k = 1 - Math.exp(-dt / 0.1);
+    hs.x += (bumpTo.x - hs.x) * k; hs.y += (bumpTo.y - hs.y) * k;
+  }
+  if (Math.abs(hs.x) > XL) { if (Math.abs(hs.vx) > 12) { burst(hs.x + Math.sign(hs.x) * 1.5, hs.y, hs.z, 8); shake = Math.max(shake, 0.4); } hs.x = Math.sign(hs.x) * XL; hs.vx *= -0.4; }
+  if (hs.y < FLOOR) { if (hs.vy < -8) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
+  if (hs.y > CEIL) { hs.y = CEIL; hs.vy = Math.min(0, hs.vy); }
+
+  const R = 1.3;
+  for (const o of obstacles) {
+    if (o.hit || Math.abs(hs.z - o.z) > o.depth / 2 + 1.2) continue;
+    for (const b of o.boxes) {
+      const cx = clamp(hs.x, b.x0, b.x1), cy = clamp(hs.y, b.y0, b.y1);
+      if ((hs.x - cx) ** 2 + (hs.y - cy) ** 2 < R * R) { bonk(o); break; }
+    }
+  }
+  for (const r of ringObjs) {
+    if (!r.done && hs.z < r.z) {
+      r.done = true;
+      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 3.6 * 3.6) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
+    }
+  }
+  // recycle and spawn
+  for (const b of buildings) if (b.z > hs.z + 50) { b.z -= NSEG * SEG; dressBuilding(b); }
+  for (const d of dashes) if (d.position.z > hs.z + 30) d.position.z -= dashes.length * 16;
+  while (obstacles.length && obstacles[0].z > hs.z + 30) { const o = obstacles.shift(); scene.remove(o.group); o.mat.dispose(); }
+  while (ringObjs.length && ringObjs[0].z > hs.z + 30) { scene.remove(ringObjs.shift().m); }
+  const gap = 95 - Math.min(1, dist / 2200) * 35;
+  while (nextObsZ > hs.z - 430) {
+    spawnObstacle(nextObsZ);
+    if (Math.random() < 0.35) addRing(rand(-12, 12), rand(6, 26), nextObsZ - gap / 2);
+    nextObsZ -= gap * rand(0.9, 1.2);
+  }
+}
+let camPos = null;
+function updateVisuals(dt, now) {
+  const hs = heliState;
+  heli.position.set(hs.x, hs.y + Math.sin(now / 400) * 0.12, hs.z);
+  const bank = clamp(hs.vx / 27, -1.3, 1.3), climb = clamp(hs.vy / 18, -1.3, 1.3);
+  heli.rotation.set(-0.16 + climb * 0.22, -bank * 0.22, -bank * 0.62);
+  rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
+  buildWorld.ground.position.set(0, 0, hs.z - 300);
+
+  const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
+  if (!camPos) camPos = { x: tx, y: ty };
+  const k = 1 - Math.exp(-dt / 0.12);
+  camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k;
+  shake *= Math.exp(-dt / 0.18);
+  camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
+  camera.up.set(Math.sin(bank * 0.12), Math.cos(bank * 0.12), 0);
+  camera.lookAt(hs.x * 0.95, hs.y + 1.9, hs.z - 34);
+  const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - 38) / 44, 0, 1) * 8;
+  if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
+
+  const pos = sparkGeo.attributes.position.array;
+  for (let i = 0; i < sparks.length; i++) {
+    const s = sparks[i];
+    if (s.life > 0) { s.life -= dt; s.vy -= 22 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += (s.vz - speed) * dt; if (s.life <= 0) s.y = -999; }
+    pos[i * 3] = s.x; pos[i * 3 + 1] = s.y; pos[i * 3 + 2] = s.z;
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+}
+
+/* ---------------- main loop ---------------- */
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 3);
   W = window.innerWidth; H = window.innerHeight;
-  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (renderer) { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
 }
 window.addEventListener("resize", resize);
-window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "run") startCal(); }, 300));
-resize();
+window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "play" && inputMode === "head") startCal(false); }, 350));
 
-async function makeLandmarker(which) {
-  const opts = d => ({
-    baseOptions: { modelAssetPath: MODEL, delegate: d },
-    runningMode: "VIDEO", numFaces: 1,
-    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
-  });
-  if (landmarker) { try { landmarker.close(); } catch (e) {} landmarker = null; }
-  try {
-    landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts(which));
-    delegate = which;
-  } catch (e) {
-    if (which === "GPU") {
-      landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts("CPU"));
-      delegate = "CPU";
-    } else throw e;
+let last = performance.now(), lastInp = { sx: 0, sy: 0 };
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (inputMode === "head") infer(now);
+  if (state === "cal") stepCal(now);
+  else if (state === "play") {
+    lastInp = inputMode === "head" ? headInput(now) : touchInput();
+    update(dt, lastInp);
+    if (flashUntil && now > flashUntil) { flashUntil = 0; $("gd-msg").style.display = "none"; }
+    if (!flashUntil && inputMode === "head") {
+      const lost = now - lastSeenAt > 700;
+      $("gd-msg").style.display = lost ? "block" : "none";
+      if (lost) { $("gd-msgtext").textContent = "Can't see your face"; $("gd-msgsub").textContent = ""; }
+    }
   }
-  $("gd-deleg").textContent = delegate;
+  updateVisuals(dt, now);
+  renderer.render(scene, camera);
+  $("gd-score").textContent = Math.floor(dist) + " m   ◎ " + rings + "   💥 " + bonks;
+  if (showDbg) {
+    const n = v => (v >= 0 ? "+" : "") + v.toFixed(2);
+    $("gd-debug").textContent = "v" + VERSION + " " + inputMode + " " + (inputMode === "head" ? delegate + " " + fps.toFixed(0) + "fps " + inferMs.toFixed(0) + "ms" : "") + "\n" +
+      (pose ? "yaw" + n(pose.yaw) + " roll" + n(pose.roll) + " pitch" + n(pose.pitch) + "\n" +
+              "turn" + n(parts.t) + " tilt" + n(parts.r) + " nod" + n(parts.p) + "\n" : "") +
+      "signs " + signs.yaw + " " + signs.roll + " " + signs.pitch + "\n" +
+      "in x" + n(lastInp.sx) + " y" + n(lastInp.sy) + "  spd " + speed.toFixed(0);
+  }
+  requestAnimationFrame(tick);
 }
 
-$("gd-go").addEventListener("click", async () => {
-  $("gd-go").disabled = true;
+async function makeLandmarker(vision, fileset, which) {
+  const opts = d => ({ baseOptions: { modelAssetPath: MODEL, delegate: d }, runningMode: "VIDEO", numFaces: 1,
+    outputFaceBlendshapes: false, outputFacialTransformationMatrixes: true });
+  try { landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts(which)); delegate = which; }
+  catch (e) { if (which !== "GPU") throw e; landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts("CPU")); delegate = "CPU"; }
+}
+async function begin(mode) {
+  $("gd-go").disabled = true; $("gd-touch").disabled = true;
   try {
-    statusEl.textContent = "Asking for the camera…";
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-    video.srcObject = stream;
-    await video.play();
-    statusEl.textContent = "Loading face tracker (a few MB, first time only)…";
-    vision = await import(MP + "/vision_bundle.mjs");
-    fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
-    await makeLandmarker("GPU");
+    inputMode = mode;
+    if (mode === "head" && !FAKE) {
+      statusEl.textContent = "Asking for the camera…";
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      video.srcObject = stream; await video.play();
+      statusEl.textContent = "Loading face tracker…";
+      const vision = await import(MP + "/vision_bundle.mjs");
+      const fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
+      await makeLandmarker(vision, fileset, "GPU");
+    }
+    statusEl.textContent = "Building the city…";
+    THREE = await import(THREE_URL);
+    renderer = new THREE.WebGLRenderer({ canvas: $("gd-canvas"), antialias: true, powerPreference: "high-performance" });
+    buildWorld(); resize();
     try { await navigator.wakeLock?.request("screen"); } catch (e) {}
     $("gd-start").style.display = "none";
-    $("gd-hud").style.display = "flex";
-    startCal();
-    requestAnimationFrame(loop);
+    $("gd-score").style.display = "block"; $("gd-gear").style.display = "block";
+    if (mode === "head") startCal(!haveSigns);
+    else { state = "play"; flash("GO!", "Drag to steer", 1200); $("gd-bar").style.display = "none"; }
+    last = performance.now(); requestAnimationFrame(tick);
   } catch (e) {
     statusEl.textContent = "Couldn't start: " + (e && (e.message || e.name) || e);
-    $("gd-go").disabled = false;
+    $("gd-go").disabled = false; $("gd-touch").disabled = false;
   }
+}
+$("gd-go").addEventListener("click", () => begin("head"));
+$("gd-touch").addEventListener("click", () => begin("touch"));
+$("gd-gear").addEventListener("click", () => { const p = $("gd-panel"); p.style.display = p.style.display === "flex" ? "none" : "flex"; });
+$("gd-recenter").addEventListener("click", () => { if (raw) { neutral = { ...raw }; flash("Recentered", "", 600); } });
+$("gd-recal").addEventListener("click", () => { if (inputMode === "head") { $("gd-panel").style.display = "none"; startCal(true); } });
+$("gd-steer").addEventListener("click", () => {
+  steerMode = steerMode === "both" ? "turn" : steerMode === "turn" ? "tilt" : "both";
+  $("gd-steer").textContent = "Steer: " + steerMode[0].toUpperCase() + steerMode.slice(1);
 });
+$("gd-feel").addEventListener("click", () => { feel = feel === "fly" ? "direct" : "fly"; $("gd-feel").textContent = "Feel: " + (feel === "fly" ? "Fly" : "Direct"); });
+$("gd-sens").addEventListener("input", e => { sens = parseFloat(e.target.value); });
+$("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
-$("gd-recal").addEventListener("click", startCal);
-$("gd-mode").addEventListener("click", () => {
-  mode = mode === "both" ? "eyes" : mode === "eyes" ? "head" : "both";
-  $("gd-mode").textContent = "Mode: " + mode[0].toUpperCase() + mode.slice(1);
-});
-$("gd-smooth").addEventListener("input", e => { tau = parseFloat(e.target.value); });
-$("gd-dbgBtn").addEventListener("click", () => {
-  showDbg = !showDbg; dbgEl.style.display = showDbg ? "block" : "none"; video.classList.toggle("show", showDbg);
-});
-$("gd-deleg").addEventListener("click", async () => {
-  const next = delegate === "GPU" ? "CPU" : "GPU";
-  $("gd-deleg").textContent = "…";
-  try { await makeLandmarker(next); } catch (e) { $("gd-deleg").textContent = "ERR"; }
-});
-
-function startCal() { state = "calibrating"; calStep = 0; calTmp = {}; beginStep(); }
-function beginStep() { calT0 = performance.now(); calSum = { ex: 0, ey: 0, hx: 0, hy: 0 }; calN = 0; }
-
-function extract(res) {
-  const cats = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
-  if (!cats) return null;
-  const b = {};
-  for (const c of cats) b[c.categoryName] = c.score;
-  const g = k => b[k] || 0;
-  // Signs don't matter here: calibration works out which way is which.
-  const ex = (g("eyeLookInLeft") + g("eyeLookOutRight") - g("eyeLookOutLeft") - g("eyeLookInRight")) / 2;
-  const ey = (g("eyeLookUpLeft") + g("eyeLookUpRight") - g("eyeLookDownLeft") - g("eyeLookDownRight")) / 2;
-  const blink = (g("eyeBlinkLeft") + g("eyeBlinkRight")) / 2;
-  let hx = 0, hy = 0;
-  const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
-  if (m) { hx = Math.atan2(m[8], m[10]); hy = Math.asin(clamp(-m[9], -1, 1)); }  // column-major: forward axis = m[8..10]
-  return { ex, ey, hx, hy, blink };
-}
-
-// Map a raw value to -1..+1 using the calibrated center and the two extremes.
-function norm(v, c, neg, pos, min) {
-  const dp = pos - c, dn = neg - c, d = v - c;
-  if (Math.abs(dp) < min && Math.abs(dn) < min) return null;   // this signal barely moved in calibration: ignore it
-  if (Math.abs(dp) >= min && d * dp > 0) return d / dp;
-  if (Math.abs(dn) >= min && d * dn > 0) return -d / dn;
-  const slope = (pos - neg) / 2;
-  return Math.abs(slope) >= min ? d / slope : 0;
-}
-function combine(e, h) {
-  if (mode === "eyes") return e ?? 0;
-  if (mode === "head") return h ?? 0;
-  if (e == null && h == null) return 0;
-  if (e == null) return h;
-  if (h == null) return e;
-  return (e + h) / 2;
-}
-let held = { nx: 0, ny: 0 }, parts = {};
-function estimate() {
-  if (!cal || !feat) return held;
-  const EM = 0.03, HM = 0.02;
-  let enx = norm(feat.ex, cal.c.ex, cal.l.ex, cal.r.ex, EM), eny = norm(feat.ey, cal.c.ey, cal.u.ey, cal.d.ey, EM);
-  const hnx = norm(feat.hx, cal.c.hx, cal.l.hx, cal.r.hx, HM), hny = norm(feat.hy, cal.c.hy, cal.u.hy, cal.d.hy, HM);
-  if (feat.blink > 0.5 && mode !== "head") return held;        // eyes closing: hold position
-  parts = { enx, eny, hnx, hny };
-  held = { nx: clamp(combine(enx, hnx), -1.3, 1.3), ny: clamp(combine(eny, hny), -1.3, 1.3) };
-  return held;
-}
-
-function infer(now) {
-  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-  const t0 = performance.now();
-  let res;
-  try { res = landmarker.detectForVideo(video, now); } catch (e) { return; }
-  inferMs += (performance.now() - t0 - inferMs) * 0.1;
-  if (lastInferAt) fps += (1000 / Math.max(1, now - lastInferAt) - fps) * 0.1;
-  lastInferAt = now;
-  const f = extract(res);
-  faceSeen = !!f;
-  if (f) feat = f;
-}
-
-function loop(now) {
-  const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
-  infer(now);
-  ctx.clearRect(0, 0, W, H);
-  const cx = W / 2, cy = H / 2;
-
-  if (state === "calibrating") {
-    const s = STEPS[calStep], t = now - calT0;
-    const tx = cx + s.x * REACH * W, ty = cy + s.y * REACH * H;
-    if (t > SETTLE && faceSeen && feat && feat.blink < 0.5) {
-      calSum.ex += feat.ex; calSum.ey += feat.ey; calSum.hx += feat.hx; calSum.hy += feat.hy; calN++;
-    }
-    const p = clamp((t - SETTLE) / SAMPLE, 0, 1);
-    ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(tx, ty, 34 - 20 * p, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#aab3c5"; ctx.font = "16px -apple-system, system-ui, sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(faceSeen ? s.label + "  (" + (calStep + 1) + "/5)" : "Can't see your face", cx, cy + (s.y === 0 && s.x === 0 ? 60 : 0) + (s.y === 0 ? 50 : 0));
-    if (t > SETTLE + SAMPLE) {
-      if (calN >= 5) {
-        calTmp[s.key] = { ex: calSum.ex / calN, ey: calSum.ey / calN, hx: calSum.hx / calN, hy: calSum.hy / calN };
-        calStep++;
-        if (calStep >= STEPS.length) { cal = calTmp; state = "run"; dot.x = cx; dot.y = cy; }
-        else beginStep();
-      } else beginStep();   // not enough good frames: repeat this spot
-    }
-  } else if (state === "run") {
-    const e = estimate();
-    const tx = cx + e.nx * REACH * W, ty = cy + e.ny * REACH * H;
-    const k = 1 - Math.exp(-dt / tau);
-    dot.x += (tx - dot.x) * k; dot.y += (ty - dot.y) * k;
-
-    // Three steering lanes: the resolution the racer actually needs.
-    const lane = dot.x < W / 3 ? 0 : dot.x < 2 * W / 3 ? 1 : 2;
-    for (let i = 0; i < 3; i++) {
-      ctx.fillStyle = i === lane ? "rgba(127,212,255,0.16)" : "rgba(255,255,255,0.03)";
-      ctx.fillRect(i * W / 3 + 2, 0, W / 3 - 4, H);
-    }
-    ctx.fillStyle = "#56607a"; ctx.font = "13px -apple-system, system-ui, sans-serif"; ctx.textAlign = "center";
-    ["LEFT", "CENTER", "RIGHT"].forEach((n, i) => ctx.fillText(n, (i + 0.5) * W / 3, cy - REACH * H - 30 > 40 ? 60 : 40));
-    // calibration targets, faint, for checking accuracy by eye
-    ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 1.5;
-    for (const s of STEPS) { ctx.beginPath(); ctx.arc(cx + s.x * REACH * W, cy + s.y * REACH * H, 12, 0, Math.PI * 2); ctx.stroke(); }
-    // the dot
-    ctx.fillStyle = faceSeen ? "#ffd24a" : "#7a5c1a";
-    ctx.shadowColor = "#ffd24a"; ctx.shadowBlur = faceSeen ? 24 : 0;
-    ctx.beginPath(); ctx.arc(clamp(dot.x, 0, W), clamp(dot.y, 0, H), 16, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-    if (!faceSeen) { ctx.fillStyle = "#ffcf7f"; ctx.font = "15px -apple-system, system-ui, sans-serif"; ctx.fillText("Can't see your face", cx, cy + 50); }
-  }
-
-  if (showDbg) {
-    const n = v => v == null ? "  -- " : (v >= 0 ? "+" : "") + v.toFixed(2);
-    dbgEl.textContent =
-      "v" + VERSION + "  " + delegate + "  " + fps.toFixed(0) + " fps  " + inferMs.toFixed(0) + " ms\n" +
-      "video " + video.videoWidth + "x" + video.videoHeight + "\n" +
-      (feat ? "eye raw  x" + n(feat.ex) + " y" + n(feat.ey) + "\n" +
-              "head raw x" + n(feat.hx) + " y" + n(feat.hy) + "\n" +
-              "blink " + feat.blink.toFixed(2) + "\n" : "") +
-      (state === "run" ? "eye  ->  x" + n(parts.enx) + " y" + n(parts.eny) + "\n" +
-                         "head ->  x" + n(parts.hnx) + " y" + n(parts.hny) : "");
-  }
-  requestAnimationFrame(loop);
-}
+if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, get: () => ({ state, signs, neutral, lastInp, heliState, dist, rings, bonks, speed, obstacles: obstacles.length }) };
 </script>
 </body>
 </html>
