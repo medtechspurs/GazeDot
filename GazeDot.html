@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Gaze Dot v0.1</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
+    font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
+    touch-action: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  /* Keep the video rendered (not display:none) so iOS keeps decoding frames. */
+  video { position: fixed; top: calc(env(safe-area-inset-top) + 8px); right: 8px; width: 72px;
+    border-radius: 8px; transform: scaleX(-1); opacity: 0.01; pointer-events: none; }
+  video.show { opacity: 0.6; }
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 24px; text-align: center; background: #0b0d12; z-index: 5; }
+  #start h1 { margin: 0; font-size: 34px; letter-spacing: 0.5px; }
+  #ver { font-size: 15px; color: #7fd4ff; font-weight: 600; }
+  #start p { margin: 0; max-width: 320px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
+  button { font: inherit; color: #0b0d12; background: #7fd4ff; border: 0; border-radius: 12px;
+    padding: 12px 18px; font-weight: 600; }
+  #go { font-size: 19px; padding: 16px 34px; }
+  #status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 320px; }
+  #hud { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
+    display: none; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; z-index: 3; padding: 0 8px; }
+  #hud button { background: #1d2330; color: #e8ecf4; font-size: 13px; padding: 9px 12px; }
+  #hud label { font-size: 12px; color: #aab3c5; display: flex; align-items: center; gap: 6px; }
+  #hud input { width: 90px; }
+  #dbg { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
+    color: #9fe8a8; white-space: pre; display: none; z-index: 3; pointer-events: none; }
+  #tag { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 2px); right: 8px; font-size: 10px; color: #56607a; z-index: 3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<video id="v" playsinline muted autoplay></video>
+
+<div id="start">
+  <h1>Gaze Dot</h1>
+  <div id="ver">v0.1</div>
+  <p>Tracking test for the look-to-steer racer. Uses the front camera; nothing leaves your phone.</p>
+  <p>Hold the phone the way you'd play, in decent light. You'll follow a dot to five spots to calibrate.</p>
+  <button id="go">Start</button>
+  <div id="status"></div>
+</div>
+
+<div id="hud">
+  <button id="recal">Recalibrate</button>
+  <button id="mode">Mode: Both</button>
+  <label>Smooth <input id="smooth" type="range" min="0.02" max="0.5" step="0.01" value="0.12"></label>
+  <button id="dbgBtn">Debug</button>
+  <button id="deleg">GPU</button>
+</div>
+<div id="dbg"></div>
+<div id="tag">v0.1</div>
+
+<script type="module">
+const VERSION = "0.1";
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
+const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+
+const $ = id => document.getElementById(id);
+const canvas = $("c"), ctx = canvas.getContext("2d"), video = $("v");
+const statusEl = $("status"), dbgEl = $("dbg");
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+let vision = null, fileset = null, landmarker = null, delegate = "GPU";
+let state = "idle";            // idle | calibrating | run
+let mode = "both";             // both | eyes | head
+let tau = 0.12, showDbg = false;
+let W = 0, H = 0, dpr = 1;
+let feat = null, faceSeen = false, lastVideoTime = -1;
+let fps = 0, inferMs = 0, lastInferAt = 0;
+let dot = { x: 0, y: 0 }, lastFrame = performance.now();
+let cal = null, calStep = 0, calT0 = 0, calSum = null, calN = 0, calTmp = {};
+
+const STEPS = [
+  { key: "c", x: 0,  y: 0,  label: "Look at the dot" },
+  { key: "l", x: -1, y: 0,  label: "Left" },
+  { key: "r", x: 1,  y: 0,  label: "Right" },
+  { key: "u", x: 0,  y: -1, label: "Up" },
+  { key: "d", x: 0,  y: 1,  label: "Down" },
+];
+const SETTLE = 900, SAMPLE = 1100, REACH = 0.4;   // targets sit at 40% of width/height from center
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "run") startCal(); }, 300));
+resize();
+
+async function makeLandmarker(which) {
+  const opts = d => ({
+    baseOptions: { modelAssetPath: MODEL, delegate: d },
+    runningMode: "VIDEO", numFaces: 1,
+    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
+  });
+  if (landmarker) { try { landmarker.close(); } catch (e) {} landmarker = null; }
+  try {
+    landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts(which));
+    delegate = which;
+  } catch (e) {
+    if (which === "GPU") {
+      landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts("CPU"));
+      delegate = "CPU";
+    } else throw e;
+  }
+  $("deleg").textContent = delegate;
+}
+
+$("go").addEventListener("click", async () => {
+  $("go").disabled = true;
+  try {
+    statusEl.textContent = "Asking for the camera…";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    video.srcObject = stream;
+    await video.play();
+    statusEl.textContent = "Loading face tracker (a few MB, first time only)…";
+    vision = await import(MP + "/vision_bundle.mjs");
+    fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
+    await makeLandmarker("GPU");
+    try { await navigator.wakeLock?.request("screen"); } catch (e) {}
+    $("start").style.display = "none";
+    $("hud").style.display = "flex";
+    startCal();
+    requestAnimationFrame(loop);
+  } catch (e) {
+    statusEl.textContent = "Couldn't start: " + (e && (e.message || e.name) || e);
+    $("go").disabled = false;
+  }
+});
+
+$("recal").addEventListener("click", startCal);
+$("mode").addEventListener("click", () => {
+  mode = mode === "both" ? "eyes" : mode === "eyes" ? "head" : "both";
+  $("mode").textContent = "Mode: " + mode[0].toUpperCase() + mode.slice(1);
+});
+$("smooth").addEventListener("input", e => { tau = parseFloat(e.target.value); });
+$("dbgBtn").addEventListener("click", () => {
+  showDbg = !showDbg; dbgEl.style.display = showDbg ? "block" : "none"; video.classList.toggle("show", showDbg);
+});
+$("deleg").addEventListener("click", async () => {
+  const next = delegate === "GPU" ? "CPU" : "GPU";
+  $("deleg").textContent = "…";
+  try { await makeLandmarker(next); } catch (e) { $("deleg").textContent = "ERR"; }
+});
+
+function startCal() { state = "calibrating"; calStep = 0; calTmp = {}; beginStep(); }
+function beginStep() { calT0 = performance.now(); calSum = { ex: 0, ey: 0, hx: 0, hy: 0 }; calN = 0; }
+
+function extract(res) {
+  const cats = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
+  if (!cats) return null;
+  const b = {};
+  for (const c of cats) b[c.categoryName] = c.score;
+  const g = k => b[k] || 0;
+  // Signs don't matter here: calibration works out which way is which.
+  const ex = (g("eyeLookInLeft") + g("eyeLookOutRight") - g("eyeLookOutLeft") - g("eyeLookInRight")) / 2;
+  const ey = (g("eyeLookUpLeft") + g("eyeLookUpRight") - g("eyeLookDownLeft") - g("eyeLookDownRight")) / 2;
+  const blink = (g("eyeBlinkLeft") + g("eyeBlinkRight")) / 2;
+  let hx = 0, hy = 0;
+  const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
+  if (m) { hx = Math.atan2(m[8], m[10]); hy = Math.asin(clamp(-m[9], -1, 1)); }  // column-major: forward axis = m[8..10]
+  return { ex, ey, hx, hy, blink };
+}
+
+// Map a raw value to -1..+1 using the calibrated center and the two extremes.
+function norm(v, c, neg, pos, min) {
+  const dp = pos - c, dn = neg - c, d = v - c;
+  if (Math.abs(dp) < min && Math.abs(dn) < min) return null;   // this signal barely moved in calibration: ignore it
+  if (Math.abs(dp) >= min && d * dp > 0) return d / dp;
+  if (Math.abs(dn) >= min && d * dn > 0) return -d / dn;
+  const slope = (pos - neg) / 2;
+  return Math.abs(slope) >= min ? d / slope : 0;
+}
+function combine(e, h) {
+  if (mode === "eyes") return e ?? 0;
+  if (mode === "head") return h ?? 0;
+  if (e == null && h == null) return 0;
+  if (e == null) return h;
+  if (h == null) return e;
+  return (e + h) / 2;
+}
+let held = { nx: 0, ny: 0 }, parts = {};
+function estimate() {
+  if (!cal || !feat) return held;
+  const EM = 0.03, HM = 0.02;
+  let enx = norm(feat.ex, cal.c.ex, cal.l.ex, cal.r.ex, EM), eny = norm(feat.ey, cal.c.ey, cal.u.ey, cal.d.ey, EM);
+  const hnx = norm(feat.hx, cal.c.hx, cal.l.hx, cal.r.hx, HM), hny = norm(feat.hy, cal.c.hy, cal.u.hy, cal.d.hy, HM);
+  if (feat.blink > 0.5 && mode !== "head") return held;        // eyes closing: hold position
+  parts = { enx, eny, hnx, hny };
+  held = { nx: clamp(combine(enx, hnx), -1.3, 1.3), ny: clamp(combine(eny, hny), -1.3, 1.3) };
+  return held;
+}
+
+function infer(now) {
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  const t0 = performance.now();
+  let res;
+  try { res = landmarker.detectForVideo(video, now); } catch (e) { return; }
+  inferMs += (performance.now() - t0 - inferMs) * 0.1;
+  if (lastInferAt) fps += (1000 / Math.max(1, now - lastInferAt) - fps) * 0.1;
+  lastInferAt = now;
+  const f = extract(res);
+  faceSeen = !!f;
+  if (f) feat = f;
+}
+
+function loop(now) {
+  const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+  infer(now);
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+
+  if (state === "calibrating") {
+    const s = STEPS[calStep], t = now - calT0;
+    const tx = cx + s.x * REACH * W, ty = cy + s.y * REACH * H;
+    if (t > SETTLE && faceSeen && feat && feat.blink < 0.5) {
+      calSum.ex += feat.ex; calSum.ey += feat.ey; calSum.hx += feat.hx; calSum.hy += feat.hy; calN++;
+    }
+    const p = clamp((t - SETTLE) / SAMPLE, 0, 1);
+    ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(tx, ty, 34 - 20 * p, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#aab3c5"; ctx.font = "16px -apple-system, system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(faceSeen ? s.label + "  (" + (calStep + 1) + "/5)" : "Can't see your face", cx, cy + (s.y === 0 && s.x === 0 ? 60 : 0) + (s.y === 0 ? 50 : 0));
+    if (t > SETTLE + SAMPLE) {
+      if (calN >= 5) {
+        calTmp[s.key] = { ex: calSum.ex / calN, ey: calSum.ey / calN, hx: calSum.hx / calN, hy: calSum.hy / calN };
+        calStep++;
+        if (calStep >= STEPS.length) { cal = calTmp; state = "run"; dot.x = cx; dot.y = cy; }
+        else beginStep();
+      } else beginStep();   // not enough good frames: repeat this spot
+    }
+  } else if (state === "run") {
+    const e = estimate();
+    const tx = cx + e.nx * REACH * W, ty = cy + e.ny * REACH * H;
+    const k = 1 - Math.exp(-dt / tau);
+    dot.x += (tx - dot.x) * k; dot.y += (ty - dot.y) * k;
+
+    // Three steering lanes: the resolution the racer actually needs.
+    const lane = dot.x < W / 3 ? 0 : dot.x < 2 * W / 3 ? 1 : 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i === lane ? "rgba(127,212,255,0.16)" : "rgba(255,255,255,0.03)";
+      ctx.fillRect(i * W / 3 + 2, 0, W / 3 - 4, H);
+    }
+    ctx.fillStyle = "#56607a"; ctx.font = "13px -apple-system, system-ui, sans-serif"; ctx.textAlign = "center";
+    ["LEFT", "CENTER", "RIGHT"].forEach((n, i) => ctx.fillText(n, (i + 0.5) * W / 3, cy - REACH * H - 30 > 40 ? 60 : 40));
+    // calibration targets, faint, for checking accuracy by eye
+    ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 1.5;
+    for (const s of STEPS) { ctx.beginPath(); ctx.arc(cx + s.x * REACH * W, cy + s.y * REACH * H, 12, 0, Math.PI * 2); ctx.stroke(); }
+    // the dot
+    ctx.fillStyle = faceSeen ? "#ffd24a" : "#7a5c1a";
+    ctx.shadowColor = "#ffd24a"; ctx.shadowBlur = faceSeen ? 24 : 0;
+    ctx.beginPath(); ctx.arc(clamp(dot.x, 0, W), clamp(dot.y, 0, H), 16, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if (!faceSeen) { ctx.fillStyle = "#ffcf7f"; ctx.font = "15px -apple-system, system-ui, sans-serif"; ctx.fillText("Can't see your face", cx, cy + 50); }
+  }
+
+  if (showDbg) {
+    const n = v => v == null ? "  -- " : (v >= 0 ? "+" : "") + v.toFixed(2);
+    dbgEl.textContent =
+      "v" + VERSION + "  " + delegate + "  " + fps.toFixed(0) + " fps  " + inferMs.toFixed(0) + " ms\n" +
+      "video " + video.videoWidth + "x" + video.videoHeight + "\n" +
+      (feat ? "eye raw  x" + n(feat.ex) + " y" + n(feat.ey) + "\n" +
+              "head raw x" + n(feat.hx) + " y" + n(feat.hy) + "\n" +
+              "blink " + feat.blink.toFixed(2) + "\n" : "") +
+      (state === "run" ? "eye  ->  x" + n(parts.enx) + " y" + n(parts.eny) + "\n" +
+                         "head ->  x" + n(parts.hnx) + " y" + n(parts.hny) : "");
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
