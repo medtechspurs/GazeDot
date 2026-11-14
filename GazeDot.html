@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Gaze Dot v0.1</title>
+<title>Gaze Dot v0.2</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -13,56 +13,56 @@
   video { position: fixed; top: calc(env(safe-area-inset-top) + 8px); right: 8px; width: 72px;
     border-radius: 8px; transform: scaleX(-1); opacity: 0.01; pointer-events: none; }
   video.show { opacity: 0.6; }
-  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+  #gd-start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; padding: 24px; text-align: center; background: #0b0d12; z-index: 5; }
-  #start h1 { margin: 0; font-size: 34px; letter-spacing: 0.5px; }
-  #ver { font-size: 15px; color: #7fd4ff; font-weight: 600; }
-  #start p { margin: 0; max-width: 320px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
+  #gd-start h1 { margin: 0; font-size: 34px; letter-spacing: 0.5px; }
+  #gd-ver { font-size: 15px; color: #7fd4ff; font-weight: 600; }
+  #gd-start p { margin: 0; max-width: 320px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
   button { font: inherit; color: #0b0d12; background: #7fd4ff; border: 0; border-radius: 12px;
     padding: 12px 18px; font-weight: 600; }
-  #go { font-size: 19px; padding: 16px 34px; }
-  #status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 320px; }
-  #hud { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
+  #gd-go { font-size: 19px; padding: 16px 34px; }
+  #gd-status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 320px; }
+  #gd-hud { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
     display: none; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; z-index: 3; padding: 0 8px; }
-  #hud button { background: #1d2330; color: #e8ecf4; font-size: 13px; padding: 9px 12px; }
-  #hud label { font-size: 12px; color: #aab3c5; display: flex; align-items: center; gap: 6px; }
-  #hud input { width: 90px; }
-  #dbg { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
+  #gd-hud button { background: #1d2330; color: #e8ecf4; font-size: 13px; padding: 9px 12px; }
+  #gd-hud label { font-size: 12px; color: #aab3c5; display: flex; align-items: center; gap: 6px; }
+  #gd-hud input { width: 90px; }
+  #gd-dbg { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
     color: #9fe8a8; white-space: pre; display: none; z-index: 3; pointer-events: none; }
-  #tag { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 2px); right: 8px; font-size: 10px; color: #56607a; z-index: 3; }
+  #gd-tag { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 2px); right: 8px; font-size: 10px; color: #56607a; z-index: 3; }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<video id="v" playsinline muted autoplay></video>
+<canvas id="gd-c"></canvas>
+<video id="gd-v" playsinline muted autoplay></video>
 
-<div id="start">
+<div id="gd-start">
   <h1>Gaze Dot</h1>
-  <div id="ver">v0.1</div>
+  <div id="gd-ver">v0.2</div>
   <p>Tracking test for the look-to-steer racer. Uses the front camera; nothing leaves your phone.</p>
   <p>Hold the phone the way you'd play, in decent light. You'll follow a dot to five spots to calibrate.</p>
-  <button id="go">Start</button>
-  <div id="status"></div>
+  <button id="gd-go">Start</button>
+  <div id="gd-status"></div>
 </div>
 
-<div id="hud">
-  <button id="recal">Recalibrate</button>
-  <button id="mode">Mode: Both</button>
-  <label>Smooth <input id="smooth" type="range" min="0.02" max="0.5" step="0.01" value="0.12"></label>
-  <button id="dbgBtn">Debug</button>
-  <button id="deleg">GPU</button>
+<div id="gd-hud">
+  <button id="gd-recal">Recalibrate</button>
+  <button id="gd-mode">Mode: Both</button>
+  <label>Smooth <input id="gd-smooth" type="range" min="0.02" max="0.5" step="0.01" value="0.12"></label>
+  <button id="gd-dbgBtn">Debug</button>
+  <button id="gd-deleg">GPU</button>
 </div>
-<div id="dbg"></div>
-<div id="tag">v0.1</div>
+<div id="gd-dbg"></div>
+<div id="gd-tag">v0.2</div>
 
 <script type="module">
-const VERSION = "0.1";
+const VERSION = "0.2";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 const $ = id => document.getElementById(id);
-const canvas = $("c"), ctx = canvas.getContext("2d"), video = $("v");
-const statusEl = $("status"), dbgEl = $("dbg");
+const canvas = $("gd-c"), ctx = canvas.getContext("2d"), video = $("gd-v");
+const statusEl = $("gd-status"), dbgEl = $("gd-dbg");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 let vision = null, fileset = null, landmarker = null, delegate = "GPU";
@@ -110,11 +110,11 @@ async function makeLandmarker(which) {
       delegate = "CPU";
     } else throw e;
   }
-  $("deleg").textContent = delegate;
+  $("gd-deleg").textContent = delegate;
 }
 
-$("go").addEventListener("click", async () => {
-  $("go").disabled = true;
+$("gd-go").addEventListener("click", async () => {
+  $("gd-go").disabled = true;
   try {
     statusEl.textContent = "Asking for the camera…";
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -126,29 +126,29 @@ $("go").addEventListener("click", async () => {
     fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
     await makeLandmarker("GPU");
     try { await navigator.wakeLock?.request("screen"); } catch (e) {}
-    $("start").style.display = "none";
-    $("hud").style.display = "flex";
+    $("gd-start").style.display = "none";
+    $("gd-hud").style.display = "flex";
     startCal();
     requestAnimationFrame(loop);
   } catch (e) {
     statusEl.textContent = "Couldn't start: " + (e && (e.message || e.name) || e);
-    $("go").disabled = false;
+    $("gd-go").disabled = false;
   }
 });
 
-$("recal").addEventListener("click", startCal);
-$("mode").addEventListener("click", () => {
+$("gd-recal").addEventListener("click", startCal);
+$("gd-mode").addEventListener("click", () => {
   mode = mode === "both" ? "eyes" : mode === "eyes" ? "head" : "both";
-  $("mode").textContent = "Mode: " + mode[0].toUpperCase() + mode.slice(1);
+  $("gd-mode").textContent = "Mode: " + mode[0].toUpperCase() + mode.slice(1);
 });
-$("smooth").addEventListener("input", e => { tau = parseFloat(e.target.value); });
-$("dbgBtn").addEventListener("click", () => {
+$("gd-smooth").addEventListener("input", e => { tau = parseFloat(e.target.value); });
+$("gd-dbgBtn").addEventListener("click", () => {
   showDbg = !showDbg; dbgEl.style.display = showDbg ? "block" : "none"; video.classList.toggle("show", showDbg);
 });
-$("deleg").addEventListener("click", async () => {
+$("gd-deleg").addEventListener("click", async () => {
   const next = delegate === "GPU" ? "CPU" : "GPU";
-  $("deleg").textContent = "…";
-  try { await makeLandmarker(next); } catch (e) { $("deleg").textContent = "ERR"; }
+  $("gd-deleg").textContent = "…";
+  try { await makeLandmarker(next); } catch (e) { $("gd-deleg").textContent = "ERR"; }
 });
 
 function startCal() { state = "calibrating"; calStep = 0; calTmp = {}; beginStep(); }
