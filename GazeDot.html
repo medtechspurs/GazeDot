@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.3</title>
+<title>Chopper Run v0.4</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -37,6 +37,20 @@
   #gd-msg { position: fixed; left: 0; right: 0; top: 30%; text-align: center; z-index: 4; pointer-events: none;
     font-size: 22px; font-weight: 700; text-shadow: 0 2px 10px #000; padding: 0 20px; display: none; }
   #gd-msg small { display: block; font-size: 14px; font-weight: 500; color: #cfd6e6; margin-top: 8px; }
+  #gd-msg.gd-center { top: 50%; transform: translateY(-50%); font-size: 30px; }
+  #gd-intro { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 20px; text-align: center; background: rgba(8,10,16,0.88); z-index: 8; }
+  #gd-intro h2 { margin: 0; font-size: 26px; }
+  #gd-intro p { margin: 0; max-width: 330px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
+  #gd-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(340px, 88vw); }
+  .gd-fig { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 8px 6px 10px; }
+  .gd-fig svg { width: 100%; height: auto; max-height: 18vh; display: block; }
+  .gd-fig b { display: block; font-size: 15px; margin-top: 2px; }
+  .gd-fig span { display: block; font-size: 12px; color: #aab3c5; min-height: 15px; }
+  .gd-ink { fill: none; stroke: #e8ecf4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .gd-dot { fill: #e8ecf4; }
+  .gd-arr { fill: none; stroke: #7fd4ff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+  #gd-calgo { font-size: 18px; padding: 15px 28px; margin-top: 4px; }
   #gd-bar { width: 180px; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; margin: 14px auto 0; overflow: hidden; }
   #gd-barfill { height: 100%; width: 0%; background: #7fd4ff; }
   #gd-debug { position: fixed; top: calc(env(safe-area-inset-top) + 140px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
@@ -51,12 +65,49 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.3</div>
+  <div id="gd-ver">v0.4</div>
   <p>Fly a helicopter through the city with your head. Turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Fly through the gold rings. Hitting things just bounces you. Uses the front camera; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
   <button id="gd-touch">Play with touch instead</button>
   <div id="gd-status"></div>
+</div>
+
+<div id="gd-intro">
+  <h2>Quick calibration</h2>
+  <p>You'll be asked to do these four things, about two seconds each. Hold the phone the way you'll play.</p>
+  <div id="gd-figs">
+    <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
+      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
+        <circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
+        <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></g>
+      
+    </svg><b>1. Look straight</b><span>at the screen</span></div>
+    <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
+      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
+        <circle class="gd-dot" cx="35" cy="38" r="2.3"/><circle class="gd-dot" cx="49" cy="38" r="2.3"/>
+        <path class="gd-ink" d="M42 42 L42 47"/><path class="gd-ink" d="M37 52 Q42 55 47 52"/></g>
+      <path class="gd-arr" d="M68 12 Q50 2 30 11"/><path class="gd-arr" d="M39 3 L29 11 L41 15"/>
+    </svg><b>2. Turn left</b><span>like looking to your left</span></div>
+    <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
+      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g transform="rotate(-20 50 66)"><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
+        <circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
+        <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></g>
+      <path class="gd-arr" d="M74 30 Q72 10 52 5"/><path class="gd-arr" d="M62 1 L51 5 L59 13"/>
+    </svg><b>3. Tilt left</b><span>ear toward shoulder</span></div>
+    <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
+      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
+        <circle class="gd-dot" cx="43" cy="30" r="2.3"/><circle class="gd-dot" cx="57" cy="30" r="2.3"/>
+        <path class="gd-ink" d="M50 34 L50 39"/><path class="gd-ink" d="M45 44 Q50 47 55 44"/></g>
+      <path class="gd-arr" d="M86 52 L86 20"/><path class="gd-arr" d="M79 29 L86 19 L93 29"/>
+    </svg><b>4. Chin up</b><span></span></div>
+  </div>
+  <p>Small, comfortable movements are plenty.</p>
+  <button id="gd-calgo">Start calibration</button>
 </div>
 
 <div id="gd-score"></div>
@@ -71,10 +122,10 @@
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.3</div>
+<div id="gd-tag">v0.4</div>
 
 <script type="module">
-const VERSION = "0.3";
+const VERSION = "0.4";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -199,6 +250,23 @@ function stepCal(now) {
     $("gd-bar").style.display = "none";
     state = "play"; flash("GO!", "", 900);
   }
+}
+let countT0 = 0, countFull = true;
+function showIntro() {
+  state = "intro"; flashUntil = 0;
+  $("gd-msg").style.display = "none"; $("gd-panel").style.display = "none";
+  $("gd-intro").style.display = "flex";
+}
+function startCountdown(full) {
+  countFull = full; countT0 = performance.now(); state = "count"; flashUntil = 0;
+  $("gd-intro").style.display = "none";
+  $("gd-msg").classList.add("gd-center"); $("gd-msg").style.display = "block"; $("gd-bar").style.display = "none";
+  $("gd-msgsub").textContent = "";
+}
+function stepCount(now) {
+  const left = 3 - Math.floor((now - countT0) / 1000);
+  if (left <= 0) { $("gd-msg").classList.remove("gd-center"); startCal(countFull); }
+  else $("gd-msgtext").textContent = "Calibration in " + left + "…";
 }
 let flashUntil = 0;
 function flash(text, sub, ms) {
@@ -448,13 +516,14 @@ function resize() {
   if (renderer) { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
 }
 window.addEventListener("resize", resize);
-window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "play" && inputMode === "head") startCal(false); }, 350));
+window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "play" && inputMode === "head") startCountdown(false); }, 350));
 
 let last = performance.now(), lastInp = { sx: 0, sy: 0 };
 function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (inputMode === "head") infer(now);
-  if (state === "cal") stepCal(now);
+  if (state === "count") stepCount(now);
+  else if (state === "cal") stepCal(now);
   else if (state === "play") {
     lastInp = inputMode === "head" ? headInput(now) : touchInput();
     update(dt, lastInp);
@@ -505,7 +574,7 @@ async function begin(mode) {
     try { await navigator.wakeLock?.request("screen"); } catch (e) {}
     $("gd-start").style.display = "none";
     $("gd-score").style.display = "block"; $("gd-gear").style.display = "block";
-    if (mode === "head") startCal(!haveSigns);
+    if (mode === "head") showIntro();
     else { state = "play"; flash("GO!", "Drag to steer", 1200); $("gd-bar").style.display = "none"; }
     last = performance.now(); requestAnimationFrame(tick);
   } catch (e) {
@@ -517,7 +586,8 @@ $("gd-go").addEventListener("click", () => begin("head"));
 $("gd-touch").addEventListener("click", () => begin("touch"));
 $("gd-gear").addEventListener("click", () => { const p = $("gd-panel"); p.style.display = p.style.display === "flex" ? "none" : "flex"; });
 $("gd-recenter").addEventListener("click", () => { if (raw) { neutral = { ...raw }; flash("Recentered", "", 600); } });
-$("gd-recal").addEventListener("click", () => { if (inputMode === "head") { $("gd-panel").style.display = "none"; startCal(true); } });
+$("gd-recal").addEventListener("click", () => { if (inputMode === "head") showIntro(); });
+$("gd-calgo").addEventListener("click", () => startCountdown(true));
 $("gd-steer").addEventListener("click", () => {
   steerMode = steerMode === "both" ? "turn" : steerMode === "turn" ? "tilt" : "both";
   $("gd-steer").textContent = "Steer: " + steerMode[0].toUpperCase() + steerMode.slice(1);
