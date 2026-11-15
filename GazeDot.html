@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.5</title>
+<title>Chopper Run v0.6</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -65,7 +65,7 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.5</div>
+  <div id="gd-ver">v0.6</div>
   <p>Fly a helicopter through the city with your head. Turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Fly through the gold rings. Hitting things just bounces you. Uses the front camera; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
@@ -122,10 +122,10 @@
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.5</div>
+<div id="gd-tag">v0.6</div>
 
 <script type="module">
-const VERSION = "0.5";
+const VERSION = "0.6";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -154,7 +154,7 @@ let neutral = { yaw: 0, pitch: 0, roll: 0 };
 let signs = { yaw: -1, roll: 1, pitch: -1 };
 let haveSigns = false;
 // Head angle (radians) that gives full deflection. Small on purpose: subtle moves, big effect.
-const BASE_RANGE = { yaw: 0.11, roll: 0.11, pitch: 0.055 };
+const BASE_RANGE = { yaw: 0.082, roll: 0.082, pitch: 0.0275 };
 let range = { ...BASE_RANGE };
 try { const s = JSON.parse(localStorage.getItem("gd-signs") || "null"); if (s && s.yaw && s.roll && s.pitch) { signs = s; haveSigns = true; } } catch (e) {}
 
@@ -183,7 +183,10 @@ function infer(now) {
   lastSeenAt = now;
   raw = p;
   if (!pose) pose = { ...p };
-  else { const k = 0.45; pose.yaw += (p.yaw - pose.yaw) * k; pose.pitch += (p.pitch - pose.pitch) * k; pose.roll += (p.roll - pose.roll) * k; }
+  else for (const a of ["yaw", "pitch", "roll"]) {
+    const d = p[a] - pose[a], k = clamp(0.14 + Math.abs(d) / range[a] * 1.6, 0.14, 0.75);
+    pose[a] += d * k;
+  }
 }
 const dz = v => { const a = Math.abs(v), d = 0.06; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
 let parts = { t: 0, r: 0, p: 0 };
@@ -252,8 +255,8 @@ function stepCal(now) {
       if (Math.abs(dy) > 0.05) signs.yaw = -Math.sign(dy);     // head left must steer left (negative)
       if (Math.abs(dr) > 0.05) signs.roll = -Math.sign(dr);
       if (Math.abs(dp) > 0.04) signs.pitch = Math.sign(dp);    // chin up must climb (positive)
-      range = { yaw: clamp(Math.abs(dy) * 0.6, 0.05, BASE_RANGE.yaw), roll: clamp(Math.abs(dr) * 0.6, 0.05, BASE_RANGE.roll),
-                pitch: clamp(Math.abs(dp) * 0.6, 0.025, BASE_RANGE.pitch) };
+      range = { yaw: clamp(Math.abs(dy) * 0.6, 0.04, BASE_RANGE.yaw), roll: clamp(Math.abs(dr) * 0.6, 0.04, BASE_RANGE.roll),
+                pitch: clamp(Math.abs(dp) * 0.6, 0.015, BASE_RANGE.pitch) };
       haveSigns = true;
       try { localStorage.setItem("gd-signs", JSON.stringify(signs)); } catch (e) {}
     }
@@ -289,6 +292,7 @@ function flash(text, sub, ms) {
 const SH = 22;                 // half-width of the street canyon
 const XL = SH - 2.4;           // how far the chopper can go sideways
 const FLOOR = 1.6, CEIL = 38;
+const MAXVX = 31, MAXVY = 42;
 const SEG = 26, NSEG = 18;
 let heli, rotor, tailRotor, heliState, speed = 0, dist = 0, rings = 0, bonks = 0, shake = 0, bumpT = 0, bumpTo = null;
 let buildings = [], dashes = [], obstacles = [], ringObjs = [], nextObsZ = 0;
@@ -451,10 +455,10 @@ function update(dt, inp) {
 
   if (feel === "fly") {
     const k = 1 - Math.exp(-dt / 0.14);
-    hs.vx += (inp.sx * 27 - hs.vx) * k; hs.vy += (inp.sy * 18 - hs.vy) * k;
+    hs.vx += (inp.sx * MAXVX - hs.vx) * k; hs.vy += (inp.sy * MAXVY - hs.vy) * k;
   } else {
     hs.vx = clamp((inp.sx * XL - hs.x) * 6, -45, 45);
-    hs.vy = clamp((16 + inp.sy * 15 - hs.y) * 6, -35, 35);
+    hs.vy = clamp((19 + inp.sy * 18 - hs.y) * 7, -60, 60);
   }
   hs.x += hs.vx * dt; hs.y += hs.vy * dt;
   if (bumpT > 0 && bumpTo) {            // after a bonk, get shoved toward the opening
@@ -462,7 +466,7 @@ function update(dt, inp) {
     hs.x += (bumpTo.x - hs.x) * k; hs.y += (bumpTo.y - hs.y) * k;
   }
   if (Math.abs(hs.x) > XL) { if (Math.abs(hs.vx) > 12) { burst(hs.x + Math.sign(hs.x) * 1.5, hs.y, hs.z, 8); shake = Math.max(shake, 0.4); } hs.x = Math.sign(hs.x) * XL; hs.vx *= -0.4; }
-  if (hs.y < FLOOR) { if (hs.vy < -8) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
+  if (hs.y < FLOOR) { if (hs.vy < -14) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
   if (hs.y > CEIL) { hs.y = CEIL; hs.vy = Math.min(0, hs.vy); }
 
   const R = 1.3;
@@ -495,19 +499,19 @@ let camPos = null;
 function updateVisuals(dt, now) {
   const hs = heliState;
   heli.position.set(hs.x, hs.y + Math.sin(now / 400) * 0.12, hs.z);
-  const bank = clamp(hs.vx / 27, -1.3, 1.3), climb = clamp(hs.vy / 18, -1.3, 1.3);
-  heli.rotation.set(-0.16 + climb * 0.22, -bank * 0.22, -bank * 0.62);
+  const bank = clamp(hs.vx / MAXVX, -1.3, 1.3), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
+  heli.rotation.set(-0.12 + climb * 0.75, -bank * 0.25, -bank * 0.72);
   rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
   buildWorld.ground.position.set(0, 0, hs.z - 300);
 
   const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
   if (!camPos) camPos = { x: tx, y: ty };
-  const k = 1 - Math.exp(-dt / 0.12);
-  camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k;
+  const k = 1 - Math.exp(-dt / 0.12), ky = 1 - Math.exp(-dt / 0.16);
+  camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * ky;
   shake *= Math.exp(-dt / 0.18);
   camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
   camera.up.set(Math.sin(bank * 0.12), Math.cos(bank * 0.12), 0);
-  camera.lookAt(hs.x * 0.95, hs.y + 1.9, hs.z - 34);
+  camera.lookAt(hs.x * 0.95, camPos.y - 1.3, hs.z - 34);
   const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - 38) / 44, 0, 1) * 8;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
