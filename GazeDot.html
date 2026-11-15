@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.6</title>
+<title>Chopper Run v0.7</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -14,7 +14,7 @@
     border-radius: 8px; transform: scaleX(-1); opacity: 0.01; pointer-events: none; z-index: 2; }
   video.gd-show { opacity: 0.6; }
   #gd-start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 13px; padding: 24px; text-align: center; background: #0b0d12; z-index: 9; }
+    justify-content: center; gap: 12px; padding: 24px; text-align: center; background: #0b0d12; z-index: 9; }
   #gd-start h1 { margin: 0; font-size: 36px; letter-spacing: 0.5px; }
   #gd-ver { font-size: 15px; color: #7fd4ff; font-weight: 600; }
   #gd-start p { margin: 0; max-width: 330px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
@@ -24,33 +24,37 @@
   #gd-touch { background: transparent; color: #7fd4ff; font-size: 14px; font-weight: 500; padding: 6px 10px; }
   #gd-status { min-height: 40px; color: #ffcf7f; font-size: 14px; max-width: 330px; }
   #gd-score { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 0; right: 0; text-align: center;
-    font-size: 17px; font-weight: 700; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none;
+    font-size: 16px; font-weight: 700; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none;
     font-variant-numeric: tabular-nums; }
-  #gd-gear { position: fixed; top: calc(env(safe-area-inset-top) + 4px); right: 6px; z-index: 5; display: none;
+  #gd-brake { position: fixed; left: 0; right: 0; bottom: 22%; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: 3px;
+    color: #ffcf7f; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none; }
+  .gd-corner { position: fixed; top: calc(env(safe-area-inset-top) + 4px); z-index: 5; display: none;
     background: rgba(20,24,34,0.6); color: #e8ecf4; padding: 8px 12px; font-size: 18px; }
+  #gd-gear { right: 6px; } #gd-rc { left: 6px; }
   #gd-panel { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 10px);
     display: none; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; z-index: 5; padding: 0 8px; }
   #gd-panel button { background: rgba(29,35,48,0.92); color: #e8ecf4; font-size: 13px; padding: 10px 12px; }
   #gd-panel label { font-size: 12px; color: #e8ecf4; display: flex; align-items: center; gap: 6px;
     background: rgba(29,35,48,0.92); border-radius: 12px; padding: 6px 10px; }
-  #gd-panel input { width: 90px; }
+  #gd-panel input { width: 84px; }
   #gd-msg { position: fixed; left: 0; right: 0; top: 30%; text-align: center; z-index: 4; pointer-events: none;
     font-size: 22px; font-weight: 700; text-shadow: 0 2px 10px #000; padding: 0 20px; display: none; }
   #gd-msg small { display: block; font-size: 14px; font-weight: 500; color: #cfd6e6; margin-top: 8px; }
   #gd-msg.gd-center { top: 50%; transform: translateY(-50%); font-size: 30px; }
   #gd-intro { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
-    gap: 12px; padding: 20px; text-align: center; background: rgba(8,10,16,0.88); z-index: 8; }
-  #gd-intro h2 { margin: 0; font-size: 26px; }
-  #gd-intro p { margin: 0; max-width: 330px; line-height: 1.4; color: #aab3c5; font-size: 15px; }
-  #gd-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(340px, 88vw); }
-  .gd-fig { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 8px 6px 10px; }
-  .gd-fig svg { width: 100%; height: auto; max-height: 18vh; display: block; }
-  .gd-fig b { display: block; font-size: 15px; margin-top: 2px; }
+    gap: 10px; padding: 18px; text-align: center; background: rgba(8,10,16,0.9); z-index: 8; }
+  #gd-intro h2 { margin: 0; font-size: 25px; }
+  #gd-intro p { margin: 0; max-width: 340px; line-height: 1.35; color: #aab3c5; font-size: 14px; }
+  #gd-intro p b { color: #e8ecf4; }
+  #gd-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(320px, 84vw); }
+  .gd-fig { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 6px 6px 8px; }
+  .gd-fig svg { width: 100%; height: auto; max-height: 14vh; display: block; }
+  .gd-fig b { display: block; font-size: 14px; margin-top: 2px; }
   .gd-fig span { display: block; font-size: 12px; color: #aab3c5; min-height: 15px; }
   .gd-ink { fill: none; stroke: #e8ecf4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
   .gd-dot { fill: #e8ecf4; }
   .gd-arr { fill: none; stroke: #7fd4ff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
-  #gd-calgo { font-size: 18px; padding: 15px 28px; margin-top: 4px; }
+  #gd-calgo { font-size: 18px; padding: 14px 28px; margin-top: 2px; }
   #gd-bar { width: 180px; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; margin: 14px auto 0; overflow: hidden; }
   #gd-barfill { height: 100%; width: 0%; background: #7fd4ff; }
   #gd-debug { position: fixed; top: calc(env(safe-area-inset-top) + 140px); left: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace;
@@ -65,9 +69,10 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.6</div>
-  <p>Fly a helicopter through the city with your head. Turn or tilt to bank, chin up to climb, chin down to dive.</p>
-  <p>Fly through the gold rings. Hitting things just bounces you. Uses the front camera; nothing leaves your phone.</p>
+  <div id="gd-ver">v0.7</div>
+  <p>Fly a helicopter through the city with your head. Small moves: turn or tilt to bank, chin up to climb, chin down to dive.</p>
+  <p>Lean back from the phone to brake. Shout “pew!” (or tap) to fire the laser.</p>
+  <p>Uses the front camera and microphone; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
   <button id="gd-touch">Play with touch instead</button>
   <div id="gd-status"></div>
@@ -75,57 +80,50 @@
 
 <div id="gd-intro">
   <h2>Quick calibration</h2>
-  <p>You'll be asked to do these four things, about two seconds each. Hold the phone the way you'll play.</p>
+  <p>You'll be asked to do these four things, about two seconds each. Hold the phone the way you'll play, and keep the movements small.</p>
   <div id="gd-figs">
     <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
-      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
-      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
-        <circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
-        <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></g>
-      
-    </svg><b>1. Look straight</b><span>at the screen</span></div>
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/><path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/>
+      <ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/><circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
+      <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></svg><b>1. Look straight</b><span>at the screen</span></div>
     <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
-      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
-      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
-        <circle class="gd-dot" cx="35" cy="38" r="2.3"/><circle class="gd-dot" cx="49" cy="38" r="2.3"/>
-        <path class="gd-ink" d="M42 42 L42 47"/><path class="gd-ink" d="M37 52 Q42 55 47 52"/></g>
-      <path class="gd-arr" d="M68 12 Q50 2 30 11"/><path class="gd-arr" d="M39 3 L29 11 L41 15"/>
-    </svg><b>2. Turn left</b><span>like looking to your left</span></div>
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/><path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/>
+      <ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/><circle class="gd-dot" cx="35" cy="38" r="2.3"/><circle class="gd-dot" cx="49" cy="38" r="2.3"/>
+      <path class="gd-ink" d="M42 42 L42 47"/><path class="gd-ink" d="M37 52 Q42 55 47 52"/>
+      <path class="gd-arr" d="M68 12 Q50 2 30 11"/><path class="gd-arr" d="M39 3 L29 11 L41 15"/></svg><b>2. Turn left</b><span>like looking to your left</span></div>
     <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
-      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
-      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g transform="rotate(-20 50 66)"><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
-        <circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
-        <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></g>
-      <path class="gd-arr" d="M74 30 Q72 10 52 5"/><path class="gd-arr" d="M62 1 L51 5 L59 13"/>
-    </svg><b>3. Tilt left</b><span>ear toward shoulder</span></div>
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/><path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/>
+      <g transform="rotate(-20 50 66)"><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/><circle class="gd-dot" cx="43" cy="38" r="2.3"/><circle class="gd-dot" cx="57" cy="38" r="2.3"/>
+      <path class="gd-ink" d="M50 42 L50 47"/><path class="gd-ink" d="M45 52 Q50 55 55 52"/></g>
+      <path class="gd-arr" d="M74 30 Q72 10 52 5"/><path class="gd-arr" d="M62 1 L51 5 L59 13"/></svg><b>3. Tilt left</b><span>ear toward shoulder</span></div>
     <div class="gd-fig"><svg viewBox="0 0 100 100" aria-hidden="true">
-      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/>
-      <path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/><g><ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/>
-        <circle class="gd-dot" cx="43" cy="30" r="2.3"/><circle class="gd-dot" cx="57" cy="30" r="2.3"/>
-        <path class="gd-ink" d="M50 34 L50 39"/><path class="gd-ink" d="M45 44 Q50 47 55 44"/></g>
-      <path class="gd-arr" d="M86 52 L86 20"/><path class="gd-arr" d="M79 29 L86 19 L93 29"/>
-    </svg><b>4. Chin up</b><span></span></div>
+      <path class="gd-ink" d="M16 98 Q16 76 40 73 L60 73 Q84 76 84 98"/><path class="gd-ink" d="M44 61 L44 73 M56 61 L56 73"/>
+      <ellipse class="gd-ink" cx="50" cy="41" rx="17" ry="21"/><circle class="gd-dot" cx="43" cy="30" r="2.3"/><circle class="gd-dot" cx="57" cy="30" r="2.3"/>
+      <path class="gd-ink" d="M50 34 L50 39"/><path class="gd-ink" d="M45 44 Q50 47 55 44"/>
+      <path class="gd-arr" d="M86 52 L86 20"/><path class="gd-arr" d="M79 29 L86 19 L93 29"/></svg><b>4. Chin up</b><span></span></div>
   </div>
-  <p>Keep the movements small. The game responds to subtle moves.</p>
+  <p><b>In the game:</b> lean back from the phone to brake and let enemies pass. Shout <b>“pew!”</b> or tap to fire.</p>
   <button id="gd-calgo">Start calibration</button>
 </div>
 
 <div id="gd-score"></div>
-<button id="gd-gear">⚙</button>
+<div id="gd-brake">BRAKING</div>
+<button id="gd-rc" class="gd-corner">⌖</button>
+<button id="gd-gear" class="gd-corner">⚙</button>
 <div id="gd-panel">
-  <button id="gd-recenter">Recenter</button>
   <button id="gd-steer">Steer: Both</button>
   <button id="gd-feel">Feel: Fly</button>
   <label>Sens <input id="gd-sens" type="range" min="0.4" max="3" step="0.05" value="1"></label>
+  <label>Mic <input id="gd-mic" type="range" min="0.3" max="3" step="0.05" value="1"></label>
   <button id="gd-recal">Recalibrate</button>
   <button id="gd-dbgbtn">Debug</button>
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.6</div>
+<div id="gd-tag">v0.7</div>
 
 <script type="module">
-const VERSION = "0.6";
+const VERSION = "0.7";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -140,7 +138,7 @@ const video = $("gd-video"), statusEl = $("gd-status");
 let THREE = null, renderer, scene, camera;
 let landmarker = null, delegate = "GPU";
 let inputMode = "head";          // head | touch
-let state = "menu";              // menu | cal | play
+let state = "menu";              // menu | intro | count | cal | play
 let steerMode = "both";          // both | turn | tilt
 let feel = "fly";                // fly | direct
 let sens = 1, showDbg = false;
@@ -149,24 +147,24 @@ let W = 0, H = 0;
 /* ---------------- head tracking ---------------- */
 let raw = null, pose = null, faceSeen = false, lastSeenAt = 0, lastVideoTime = -1, fakePose = null;
 let fps = 0, inferMs = 0, lastInferAt = 0;
-let neutral = { yaw: 0, pitch: 0, roll: 0 };
+let neutral = { yaw: 0, pitch: 0, roll: 0, dist: 0 };
 // Which way each angle runs. These defaults are a best guess; calibration overrides them.
 let signs = { yaw: -1, roll: 1, pitch: -1 };
-let haveSigns = false;
 // Head angle (radians) that gives full deflection. Small on purpose: subtle moves, big effect.
-const BASE_RANGE = { yaw: 0.082, roll: 0.082, pitch: 0.0275 };
+const BASE_RANGE = { yaw: 0.068, roll: 0.068, pitch: 0.0275 };
 let range = { ...BASE_RANGE };
-try { const s = JSON.parse(localStorage.getItem("gd-signs") || "null"); if (s && s.yaw && s.roll && s.pitch) { signs = s; haveSigns = true; } } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem("gd-signs") || "null"); if (s && s.yaw && s.roll && s.pitch) signs = s; } catch (e) {}
 
 function readPose(res) {
   const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
   if (!m) return null;
-  // column-major 4x4. Forward axis = m[8..10]; side axis = m[0..2]; up axis = m[4..6].
-  return { yaw: Math.atan2(m[8], m[10]), pitch: Math.asin(clamp(-m[9], -1, 1)), roll: Math.atan2(m[1], m[5]) };
+  // column-major 4x4. Forward axis = m[8..10]; side axis = m[0..2]; up axis = m[4..6]; position = m[12..14].
+  return { yaw: Math.atan2(m[8], m[10]), pitch: Math.asin(clamp(-m[9], -1, 1)), roll: Math.atan2(m[1], m[5]),
+           dist: Math.hypot(m[12], m[13], m[14]) };
 }
 function infer(now) {
   let p = null;
-  if (FAKE) { p = fakePose; }
+  if (FAKE) { p = fakePose ? { dist: 40, ...fakePose } : null; }
   else {
     if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
     lastVideoTime = video.currentTime;
@@ -183,51 +181,76 @@ function infer(now) {
   lastSeenAt = now;
   raw = p;
   if (!pose) pose = { ...p };
-  else for (const a of ["yaw", "pitch", "roll"]) {
-    const d = p[a] - pose[a], k = clamp(0.14 + Math.abs(d) / range[a] * 1.6, 0.14, 0.75);
-    pose[a] += d * k;
+  else {
+    for (const a of ["yaw", "pitch", "roll"]) {      // steady when still, quick when moving
+      const d = p[a] - pose[a], k = clamp(0.14 + Math.abs(d) / range[a] * 1.6, 0.14, 0.75);
+      pose[a] += d * k;
+    }
+    pose.dist += (p.dist - pose.dist) * 0.25;
   }
 }
 const dz = v => { const a = Math.abs(v), d = 0.06; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
 let parts = { t: 0, r: 0, p: 0 };
 function headInput(now) {
-  if (!pose || now - lastSeenAt > 500) return { sx: 0, sy: 0 };
-  const t = signs.yaw * (pose.yaw - neutral.yaw) / range.yaw * sens;      // about 6 degrees of turn = full bank
-  const r = signs.roll * (pose.roll - neutral.roll) / range.roll * sens;   // about 6 degrees of tilt = full bank
-  const p = signs.pitch * (pose.pitch - neutral.pitch) / range.pitch * sens; // about 3 degrees of nod = full climb
+  if (!pose || now - lastSeenAt > 500) return { sx: 0, sy: 0, brake: 0 };
+  const t = signs.yaw * (pose.yaw - neutral.yaw) / range.yaw * sens;
+  const r = signs.roll * (pose.roll - neutral.roll) / range.roll * sens;
+  const p = signs.pitch * (pose.pitch - neutral.pitch) / range.pitch * sens;
   parts = { t, r, p };
   const s = steerMode === "turn" ? t : steerMode === "tilt" ? r : t + r;
-  return { sx: clamp(dz(s), -1, 1), sy: clamp(dz(p), -1, 1) };
+  // Face farther from the camera than it was at calibration = brake.
+  const brake = neutral.dist > 0 ? clamp((pose.dist / neutral.dist - 1.07) / 0.15, 0, 1) : 0;
+  return { sx: clamp(dz(s), -1, 1), sy: clamp(dz(p), -1, 1), brake };
 }
+function recenter() { if (raw) { neutral = { ...raw }; if (pose) pose.dist = raw.dist; flash("Recentered", "", 600); } }
 
 /* ---------------- touch / keyboard fallback ---------------- */
 let touchIn = { sx: 0, sy: 0 }, keys = {};
 function pointer(e) {
-  if (state !== "play" || inputMode !== "touch") return;
+  if (state !== "play") return;
+  if (e.type === "pointerdown") fire();
+  if (inputMode !== "touch") return;
   if (e.type === "pointerup" || e.type === "pointercancel") { touchIn = { sx: 0, sy: 0 }; return; }
   if (e.buttons === 0 && e.pointerType === "mouse") return;
   touchIn = { sx: clamp((e.clientX - W / 2) / (W * 0.35), -1, 1), sy: clamp(-(e.clientY - H / 2) / (H * 0.28), -1, 1) };
 }
 ["pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(t => $("gd-canvas").addEventListener(t, pointer));
-let lastTap = 0;
-$("gd-canvas").addEventListener("pointerdown", () => {
-  const now = performance.now();
-  if (now - lastTap < 350 && state === "play" && inputMode === "head" && raw) { neutral = { ...raw }; flash("Recentered", "", 600); }
-  lastTap = now;
-});
-window.addEventListener("keydown", e => { keys[e.key] = true; });
+window.addEventListener("keydown", e => { if (e.key === " " && !keys[" "] && state === "play") fire(); keys[e.key] = true; });
 window.addEventListener("keyup", e => { keys[e.key] = false; });
 function touchInput() {
   const kx = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0), ky = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
-  return (kx || ky) ? { sx: kx, sy: ky } : touchIn;
+  const b = keys.Shift ? 1 : 0;
+  return (kx || ky) ? { sx: kx, sy: ky, brake: b } : { ...touchIn, brake: b };
+}
+
+/* ---------------- microphone: a loud "pew!" fires ---------------- */
+let audioCtx = null, analyser = null, micBuf = null, micFloor = 0.01, micLevel = 0, micThr = 0, lastPew = 0, micSens = 1, micOK = false;
+function setupMic(stream) {
+  try {
+    if (!audioCtx || !stream.getAudioTracks().length) return;
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    micBuf = new Float32Array(analyser.fftSize);
+    if (audioCtx.state !== "running") audioCtx.resume();
+    micOK = true;
+  } catch (e) { micOK = false; }
+}
+function micTick(now) {
+  if (!micOK) return;
+  analyser.getFloatTimeDomainData(micBuf);
+  let s = 0; for (let i = 0; i < micBuf.length; i++) s += micBuf[i] * micBuf[i];
+  micLevel = Math.sqrt(s / micBuf.length);
+  micThr = Math.max(0.05, micFloor * 4) / micSens;
+  if (micLevel > micThr && now - lastPew > 330 && state === "play") { lastPew = now; fire(); }
+  micFloor += (micLevel - micFloor) * (micLevel < micFloor ? 0.2 : 0.008);   // background level: falls fast, rises slowly
 }
 
 /* ---------------- calibration ---------------- */
 const CAL_FULL = [
   { k: "c",    text: "Look straight at the screen", sub: "Hold the phone how you'll play" },
-  { k: "turn", text: "Turn your head LEFT",          sub: "like looking at something to your left" },
-  { k: "tilt", text: "Tilt your head LEFT",          sub: "left ear toward left shoulder" },
-  { k: "up",   text: "Chin UP",                      sub: "" },
+  { k: "turn", text: "Turn your head LEFT",          sub: "just a little" },
+  { k: "tilt", text: "Tilt your head LEFT",          sub: "left ear toward left shoulder, just a little" },
+  { k: "up",   text: "Chin UP",                      sub: "just a little" },
 ];
 const SETTLE = 1100, SAMPLE = 800;
 let calSteps = [], calIdx = 0, calT0 = 0, calSum = null, calN = 0, calGot = {};
@@ -236,18 +259,18 @@ function startCal(full) {
   calIdx = 0; calGot = {}; state = "cal"; beginCalStep();
   $("gd-msg").style.display = "block"; $("gd-bar").style.display = "block";
 }
-function beginCalStep() { calT0 = performance.now(); calSum = { yaw: 0, pitch: 0, roll: 0 }; calN = 0; }
+function beginCalStep() { calT0 = performance.now(); calSum = { yaw: 0, pitch: 0, roll: 0, dist: 0 }; calN = 0; }
 function stepCal(now) {
   const s = calSteps[calIdx], t = now - calT0;
   $("gd-msgtext").textContent = faceSeen ? s.text : "Can't see your face";
   $("gd-msgsub").textContent = faceSeen ? s.sub : "Bring the phone up in front of you";
   $("gd-barfill").style.width = (clamp((t - SETTLE) / SAMPLE, 0, 1) * 100) + "%";
   if (!faceSeen) { beginCalStep(); return; }
-  if (t > SETTLE && raw) { calSum.yaw += raw.yaw; calSum.pitch += raw.pitch; calSum.roll += raw.roll; calN++; }
+  if (t > SETTLE && raw) { for (const a in calSum) calSum[a] += raw[a]; calN++; }
   if (t > SETTLE + SAMPLE) {
     if (calN < 3) { beginCalStep(); return; }
-    calGot[s.k] = { yaw: calSum.yaw / calN, pitch: calSum.pitch / calN, roll: calSum.roll / calN };
-    calIdx++;
+    const got = {}; for (const a in calSum) got[a] = calSum[a] / calN;
+    calGot[s.k] = got; calIdx++;
     if (calIdx < calSteps.length) { beginCalStep(); return; }
     neutral = calGot.c;
     if (calGot.turn) {
@@ -255,9 +278,9 @@ function stepCal(now) {
       if (Math.abs(dy) > 0.05) signs.yaw = -Math.sign(dy);     // head left must steer left (negative)
       if (Math.abs(dr) > 0.05) signs.roll = -Math.sign(dr);
       if (Math.abs(dp) > 0.04) signs.pitch = Math.sign(dp);    // chin up must climb (positive)
-      range = { yaw: clamp(Math.abs(dy) * 0.6, 0.04, BASE_RANGE.yaw), roll: clamp(Math.abs(dr) * 0.6, 0.04, BASE_RANGE.roll),
+      // If the calibration moves were smaller than the base range, scale to them.
+      range = { yaw: clamp(Math.abs(dy) * 0.6, 0.035, BASE_RANGE.yaw), roll: clamp(Math.abs(dr) * 0.6, 0.035, BASE_RANGE.roll),
                 pitch: clamp(Math.abs(dp) * 0.6, 0.015, BASE_RANGE.pitch) };
-      haveSigns = true;
       try { localStorage.setItem("gd-signs", JSON.stringify(signs)); } catch (e) {}
     }
     pose = raw ? { ...raw } : pose;
@@ -292,90 +315,159 @@ function flash(text, sub, ms) {
 const SH = 22;                 // half-width of the street canyon
 const XL = SH - 2.4;           // how far the chopper can go sideways
 const FLOOR = 1.6, CEIL = 38;
-const MAXVX = 31, MAXVY = 42;
-const SEG = 26, NSEG = 18;
-let heli, rotor, tailRotor, heliState, speed = 0, dist = 0, rings = 0, bonks = 0, shake = 0, bumpT = 0, bumpTo = null;
-let buildings = [], dashes = [], obstacles = [], ringObjs = [], nextObsZ = 0;
-let unitBox, bldMats = [], ringGeo, ringMat, sparkGeo, sparks = [], sparkPts, sparkNext = 0;
+const MAXVX = 46, MAXVY = 50;
+const SEG = 26, NSEG = 28, VIEW = 640;
+const BASE_SPEED = 76, TOP_SPEED = 164;
+const MAXCURVE = 0.0018;
+let heli, rotor, tailRotor, heliState, speed = 0, cruise = BASE_SPEED, dist = 0, rings = 0, bonks = 0, kills = 0, shake = 0, bumpT = 0, bumpTo = null;
+let buildings = [], dashes = [], obstacles = [], ringObjs = [], enemies = [], nextObsZ = 0, nextChaseAt = 0, prevZ = 0;
+let curve = 0, curveTarget = 0, nextCurveAt = 0, brakeNow = 0;
+let unitBox, segBox, bldMats = [], ringGeo, ringMat, sparkGeo, sparks = [], sparkPts, sparkNext = 0, bendU, M = {};
+let laser = null, laserT = 0, scorchGeo, scorchMat, lastScorch = { x: 99, y: 99, o: null };
 
+// Arcade-racer curves: the whole world bends sideways with distance from the camera, in the vertex shader.
+function bendable(mat) {
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uBend = bendU;
+    sh.vertexShader = "uniform vec2 uBend;\n" + sh.vertexShader.replace("#include <project_vertex>",
+      "#include <project_vertex>\n mvPosition.x += uBend.x * mvPosition.z * mvPosition.z;\n mvPosition.y += uBend.y * mvPosition.z * mvPosition.z;\n gl_Position = projectionMatrix * mvPosition;");
+  };
+  return mat;
+}
+const lam = o => bendable(new THREE.MeshLambertMaterial(o));
+const bas = o => bendable(new THREE.MeshBasicMaterial(o));
+function mesh(geo, mat, sx, sy, sz, x, y, z, parent) {
+  const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.frustumCulled = false;
+  if (parent) parent.add(m); return m;
+}
 function windowTexture(lit, warm) {
   const c = document.createElement("canvas"); c.width = 64; c.height = 128;
   const g = c.getContext("2d");
   g.fillStyle = "#10131c"; g.fillRect(0, 0, 64, 128);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 8; x++) {
-    if (Math.random() < lit) {
-      g.fillStyle = Math.random() < warm ? "rgba(255,214,140," + rand(0.5, 1) + ")" : "rgba(150,200,255," + rand(0.4, 0.9) + ")";
-    } else g.fillStyle = "#1a2030";
+    if (Math.random() < lit) g.fillStyle = Math.random() < warm ? "rgba(255,214,140," + rand(0.5, 1) + ")" : "rgba(150,200,255," + rand(0.4, 0.9) + ")";
+    else g.fillStyle = "#1a2030";
     g.fillRect(x * 8 + 2, y * 8 + 2, 4, 5);
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   t.magFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3);
   return t;
 }
+function makeHeli(bodyCol, glassCol, emis) {
+  const g = new THREE.Group();
+  const bodyMat = lam({ color: bodyCol, emissive: emis }), dark = M.dark, glass = lam({ color: glassCol, emissive: glassCol, emissiveIntensity: 0.35 });
+  const sph = M.sphere;
+  mesh(sph, bodyMat, 1.05, 1.05, 1.7, 0, 0, 0, g);
+  mesh(sph, glass, 0.8, 0.72, 0.8, 0, 0.12, -0.95, g);
+  mesh(unitBox, bodyMat, 0.3, 0.3, 2.6, 0, 0.25, 2.6, g);
+  mesh(unitBox, bodyMat, 0.12, 1.1, 0.6, 0, 0.7, 3.7, g);
+  const tail = mesh(unitBox, dark, 0.06, 1.3, 0.16, 0.22, 0.7, 3.7, g);
+  mesh(unitBox, dark, 0.18, 0.5, 0.18, 0, 1.2, 0, g);
+  const rot = new THREE.Group(); rot.position.set(0, 1.5, 0);
+  for (let i = 0; i < 2; i++) { const bl = mesh(unitBox, M.blade, 6.4, 0.05, 0.3, 0, 0, 0, rot); bl.rotation.y = i * Math.PI / 2; }
+  g.add(rot);
+  for (const sx of [-0.7, 0.7]) { mesh(unitBox, dark, 0.1, 0.1, 2.4, sx, -1.25, 0, g); mesh(unitBox, dark, 0.08, 0.5, 0.08, sx, -1.0, 0, g); }
+  return { g, rot, tail };
+}
+function wingGeo(span, chord) {
+  const s = new THREE.Shape();
+  s.moveTo(0, -chord * 0.5); s.lineTo(span, -chord * 0.1); s.lineTo(span * 0.8, chord * 0.2); s.lineTo(span * 0.55, chord * 0.1);
+  s.lineTo(span * 0.35, chord * 0.5); s.lineTo(0, chord * 0.45); s.closePath();
+  const g = new THREE.ShapeGeometry(s); g.rotateX(Math.PI / 2); return g;   // flat, spanning +x, chord along z
+}
+function addWings(g, geo, mat, y, z) {
+  const wings = [];
+  for (const side of [1, -1]) {
+    const piv = new THREE.Group(); piv.position.set(side * 0.3, y, z); piv.scale.x = side;
+    const w = new THREE.Mesh(geo, mat); w.frustumCulled = false; piv.add(w); g.add(piv); wings.push(piv);
+  }
+  return wings;
+}
+function makeDragon() {
+  const g = new THREE.Group(), b = M.dragon, d = M.dragonDark;
+  mesh(M.sphere, b, 0.95, 0.95, 2.6, 0, 0, 0, g);
+  const neck = mesh(unitBox, b, 0.55, 0.55, 1.6, 0, 0.45, -2.6, g); neck.rotation.x = 0.45;
+  mesh(unitBox, b, 0.8, 0.65, 1.3, 0, 0.95, -3.7, g);
+  mesh(unitBox, M.eye, 0.86, 0.14, 0.2, 0, 1.1, -3.9, g);
+  mesh(unitBox, d, 0.5, 0.2, 0.9, 0, 0.6, -3.9, g);
+  for (let i = 0; i < 4; i++) mesh(unitBox, i % 2 ? d : b, 0.6 - i * 0.12, 0.6 - i * 0.12, 1.1, 0, -0.05 * i, 2.6 + i * 1.05, g);
+  for (let i = 0; i < 5; i++) { const sp = mesh(M.cone, d, 0.22, 0.6, 0.22, 0, 1.05 - Math.abs(i - 1.5) * 0.12, -1.6 + i * 0.9, g); }
+  const wings = addWings(g, M.dragonWing, M.dragonMem, 0.5, -0.4);
+  g.scale.setScalar(1.25);
+  return { g, wings };
+}
+function makePtero() {
+  const g = new THREE.Group(), b = M.ptero;
+  mesh(M.sphere, b, 0.5, 0.5, 1.7, 0, 0, 0, g);
+  mesh(M.sphere, b, 0.45, 0.45, 0.6, 0, 0.3, -1.7, g);
+  const beak = mesh(M.cone, M.pteroBeak, 0.22, 2.0, 0.22, 0, 0.25, -3.0, g); beak.rotation.x = -Math.PI / 2;
+  const crest = mesh(M.cone, M.pteroBeak, 0.16, 1.5, 0.3, 0, 0.75, -1.0, g); crest.rotation.x = Math.PI / 2 - 0.5;
+  mesh(unitBox, M.eye, 0.94, 0.12, 0.14, 0, 0.42, -1.85, g);
+  const wings = addWings(g, M.pteroWing, M.pteroMem, 0.1, -0.3);
+  g.scale.setScalar(1.3);
+  return { g, wings };
+}
 function buildWorld() {
   scene = new THREE.Scene();
-  // dusk sky
+  bendU = { value: new THREE.Vector2(0, 0) };
   const sc = document.createElement("canvas"); sc.width = 4; sc.height = 256;
   const sg = sc.getContext("2d"), grad = sg.createLinearGradient(0, 0, 0, 256);
   grad.addColorStop(0, "#0a0f2e"); grad.addColorStop(0.45, "#3b2a66"); grad.addColorStop(0.72, "#c2557a"); grad.addColorStop(1, "#ffb36b");
   sg.fillStyle = grad; sg.fillRect(0, 0, 4, 256);
   const sky = new THREE.CanvasTexture(sc); sky.colorSpace = THREE.SRGBColorSpace;
   scene.background = sky;
-  scene.fog = new THREE.Fog(0x8a4a78, 70, 430);
+  scene.fog = new THREE.Fog(0x8a4a78, 90, VIEW);
   scene.add(new THREE.HemisphereLight(0xaab4ff, 0x2a1838, 1.5));
   const sun = new THREE.DirectionalLight(0xffb37a, 1.6); sun.position.set(-0.5, 0.8, -1); scene.add(sun);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 950);
 
-  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 600);
   unitBox = new THREE.BoxGeometry(1, 1, 1);
+  segBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 14);   // long things need extra slices so they follow the curve
+  M.sphere = new THREE.SphereGeometry(1, 14, 10);
+  M.cone = new THREE.ConeGeometry(1, 1, 8);
+  M.dark = lam({ color: 0x22262f });
+  M.blade = bas({ color: 0xdfe6f5, transparent: true, opacity: 0.75 });
+  M.eye = bas({ color: 0xffe14a });
+  M.dragon = lam({ color: 0x3fae4a, emissive: 0x0c3010 }); M.dragonDark = lam({ color: 0x1f6a2c });
+  M.dragonMem = lam({ color: 0xd84a3a, emissive: 0x3a0c08, side: THREE.DoubleSide });
+  M.dragonWing = wingGeo(5.2, 3.4);
+  M.ptero = lam({ color: 0xb98a5a, emissive: 0x2a1a0a }); M.pteroBeak = lam({ color: 0xe8c36a });
+  M.pteroMem = lam({ color: 0x8a5a3a, emissive: 0x1a0c04, side: THREE.DoubleSide });
+  M.pteroWing = wingGeo(5.6, 1.9);
 
-  // ground
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 1200), new THREE.MeshLambertMaterial({ color: 0x181b26 }));
-  ground.rotation.x = -Math.PI / 2; scene.add(ground); buildWorld.ground = ground;
-  const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2e9b0 });
-  for (let i = 0; i < 28; i++) {
-    const d = new THREE.Mesh(unitBox, dashMat); d.scale.set(0.7, 0.05, 6); d.position.set(0, 0.03, 40 - i * 16);
-    scene.add(d); dashes.push(d);
-  }
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 1700, 1, 90), lam({ color: 0x181b26 }));
+  ground.rotation.x = -Math.PI / 2; ground.frustumCulled = false; scene.add(ground); M.ground = ground;
+  const dashMat = bas({ color: 0xf2e9b0 });
+  for (let i = 0; i < 46; i++) { const d = mesh(unitBox, dashMat, 0.7, 0.05, 6, 0, 0.03, 40 - i * 16, scene); dashes.push(d); }
 
-  // buildings
   const tints = [0x8f9bd6, 0xb08fd0, 0x7fb0c8, 0xd09a8f, 0x9aa0b4];
   for (let i = 0; i < 5; i++) {
     const tex = windowTexture(rand(0.25, 0.6), rand(0.4, 0.9));
-    bldMats.push(new THREE.MeshLambertMaterial({ color: tints[i], map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.85 }));
+    bldMats.push(lam({ color: tints[i], map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.85 }));
   }
   for (let i = 0; i < NSEG; i++) for (const side of [-1, 1]) {
-    const m = new THREE.Mesh(unitBox, pick(bldMats)); scene.add(m);
+    const m = mesh(unitBox, pick(bldMats), 1, 1, 1, 0, 0, 0, scene);
     const b = { m, side, z: 40 - i * SEG }; dressBuilding(b); buildings.push(b);
   }
 
-  // helicopter (nose points toward -Z)
-  heli = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xff5a3c, emissive: 0x401008 });
-  const dark = new THREE.MeshLambertMaterial({ color: 0x22262f });
-  const glass = new THREE.MeshLambertMaterial({ color: 0x9fe3ff, emissive: 0x1a4a66 });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), bodyMat); body.scale.set(1.05, 1.05, 1.7); heli.add(body);
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.8, 14, 10), glass); nose.position.set(0, 0.12, -0.95); nose.scale.set(1, 0.9, 1); heli.add(nose);
-  const boom = new THREE.Mesh(unitBox, bodyMat); boom.scale.set(0.3, 0.3, 2.6); boom.position.set(0, 0.25, 2.6); heli.add(boom);
-  const fin = new THREE.Mesh(unitBox, bodyMat); fin.scale.set(0.12, 1.1, 0.6); fin.position.set(0, 0.7, 3.7); heli.add(fin);
-  tailRotor = new THREE.Mesh(unitBox, dark); tailRotor.scale.set(0.06, 1.3, 0.16); tailRotor.position.set(0.22, 0.7, 3.7); heli.add(tailRotor);
-  const mast = new THREE.Mesh(unitBox, dark); mast.scale.set(0.18, 0.5, 0.18); mast.position.set(0, 1.2, 0); heli.add(mast);
-  rotor = new THREE.Group(); rotor.position.set(0, 1.5, 0);
-  const bladeMat = new THREE.MeshBasicMaterial({ color: 0xdfe6f5, transparent: true, opacity: 0.75 });
-  for (let i = 0; i < 2; i++) { const bl = new THREE.Mesh(unitBox, bladeMat); bl.scale.set(6.4, 0.05, 0.3); bl.rotation.y = i * Math.PI / 2; rotor.add(bl); }
-  heli.add(rotor);
-  for (const sx of [-0.7, 0.7]) {
-    const skid = new THREE.Mesh(unitBox, dark); skid.scale.set(0.1, 0.1, 2.4); skid.position.set(sx, -1.25, 0); heli.add(skid);
-    const strut = new THREE.Mesh(unitBox, dark); strut.scale.set(0.08, 0.5, 0.08); strut.position.set(sx, -1.0, 0); heli.add(strut);
-  }
-  scene.add(heli);
+  const h = makeHeli(0xff5a3c, 0x9fe3ff, 0x401008); heli = h.g; rotor = h.rot; tailRotor = h.tail; scene.add(heli);
 
   ringGeo = new THREE.TorusGeometry(3.4, 0.32, 8, 28);
-  ringMat = new THREE.MeshBasicMaterial({ color: 0xffd24a });
+  ringMat = bas({ color: 0xffd24a });
+  scorchGeo = new THREE.CircleGeometry(1, 10);
+  scorchMat = bas({ color: 0x050505, transparent: true, opacity: 0.88, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
-  // sparks
-  const N = 140, pos = new Float32Array(N * 3).fill(-999);
+  // laser beam: a unit-length bar pointing along +z from its origin, aimed with lookAt
+  const beamGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 20); beamGeo.translate(0, 0, 0.5);
+  laser = new THREE.Group();
+  const core = new THREE.Mesh(beamGeo, bas({ color: 0xff2020, fog: false })); core.scale.set(0.22, 0.22, 1); core.frustumCulled = false;
+  const glow = new THREE.Mesh(beamGeo, bas({ color: 0xff5040, fog: false, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.scale.set(0.8, 0.8, 1); glow.frustumCulled = false;
+  laser.add(core, glow); laser.visible = false; scene.add(laser);
+
+  const N = 180, pos = new Float32Array(N * 3).fill(-999);
   sparkGeo = new THREE.BufferGeometry(); sparkGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  sparkPts = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ color: 0xffd98a, size: 0.55, transparent: true, depthWrite: false }));
+  sparkPts = new THREE.Points(sparkGeo, bendable(new THREE.PointsMaterial({ color: 0xffd98a, size: 0.6, transparent: true, depthWrite: false })));
   sparkPts.frustumCulled = false; scene.add(sparkPts);
   for (let i = 0; i < N; i++) sparks.push({ life: 0, x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0 });
 
@@ -388,90 +480,228 @@ function dressBuilding(b) {
 }
 function resetRun() {
   heliState = { x: 0, y: 14, z: 0, vx: 0, vy: 0 };
-  speed = 0; dist = 0; rings = 0; bonks = 0; shake = 0; bumpT = 0;
+  speed = 0; dist = 0; rings = 0; bonks = 0; kills = 0; shake = 0; bumpT = 0; prevZ = 0;
   for (const o of obstacles) scene.remove(o.group); obstacles = [];
   for (const r of ringObjs) scene.remove(r.m); ringObjs = [];
-  nextObsZ = -150;
+  for (const e of enemies) scene.remove(e.g); enemies = [];
+  nextObsZ = -260; nextChaseAt = 450; curve = 0; curveTarget = 0; nextCurveAt = 350;
 }
-function burst(x, y, z, n) {
+function burst(x, y, z, n, spread) {
+  const k = spread || 1;
   for (let i = 0; i < n; i++) {
     const s = sparks[sparkNext]; sparkNext = (sparkNext + 1) % sparks.length;
     s.life = rand(0.3, 0.7); s.x = x; s.y = y; s.z = z;
-    s.vx = rand(-9, 9); s.vy = rand(-3, 10); s.vz = rand(-16, 2);
+    s.vx = rand(-9, 9) * k; s.vy = rand(-3, 10) * k; s.vz = rand(-16, 2);
   }
 }
 function addRing(x, y, z) {
-  const m = new THREE.Mesh(ringGeo, ringMat); m.position.set(x, y, z); scene.add(m);
+  const m = new THREE.Mesh(ringGeo, ringMat); m.position.set(x, y, z); m.frustumCulled = false; scene.add(m);
   ringObjs.push({ m, x, y, z, done: false });
 }
-function spawnObstacle(z) {
-  const types = ["bridge", "tower", "halfwall", "lowwall"];
-  if (dist > 400) types.push("gate", "bridge", "tower");
+const OB_COLORS = { duck: 0x4fd1c5, arch: 0xff7eb6, tunnel: 0x56607e, bridge: 0x4fd1c5, tower: 0xff7eb6, halfwall: 0xb79bff, lowwall: 0xffa24a, gate: 0x7fd4ff };
+function spawnObstacle(zFront) {
+  // weighted toward things you fly under or squeeze through
+  let types = ["duck", "duck", "duck", "arch", "arch", "arch", "tunnel", "tunnel", "bridge", "tower", "halfwall", "lowwall"];
+  if (dist > 500) types = types.concat(["gate", "tunnel", "arch"]);
   const type = pick(types);
-  const colors = { bridge: 0x4fd1c5, tower: 0xff7eb6, halfwall: 0xb79bff, lowwall: 0xffa24a, gate: 0x7fd4ff };
-  const mat = new THREE.MeshLambertMaterial({ color: colors[type], emissive: colors[type], emissiveIntensity: 0.25, transparent: true });
-  const o = { group: new THREE.Group(), boxes: [], z, depth: 7, hit: false, mat, safe: { x: 0, y: 14 } };
+  const depth = type === "tunnel" ? rand(120, 190) : type === "duck" ? 14 : type === "arch" || type === "tower" ? 10 : 7;
+  const z = zFront - depth / 2;
+  const mat = lam({ color: OB_COLORS[type], emissive: OB_COLORS[type], emissiveIntensity: type === "tunnel" ? 0.12 : 0.25, transparent: true });
+  const o = { type, group: new THREE.Group(), boxes: [], z, depth, hit: false, mat, safe: { x: 0, y: 14 }, marks: 0 };
   const box = (x0, x1, y0, y1) => {
-    const m = new THREE.Mesh(unitBox, mat);
-    m.scale.set(x1 - x0, y1 - y0, o.depth); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
-    o.group.add(m); o.boxes.push({ x0, x1, y0, y1 });
+    mesh(depth > 30 ? segBox : unitBox, mat, x1 - x0, y1 - y0, depth, (x0 + x1) / 2, (y0 + y1) / 2, z, o.group);
+    o.boxes.push({ x0, x1, y0, y1 });
   };
-  if (type === "bridge") {             // beam across the street: go under or over
+  if (type === "duck") {               // a building bridging the street: duck under
+    const h = rand(7.5, 11);
+    box(-SH, SH, h, 75);
+    o.safe = { x: rand(-10, 10), y: h * 0.5 };
+  } else if (type === "arch" || type === "tunnel") {   // an opening to thread; a tunnel is a long one
+    const hw = type === "tunnel" ? 8 : 9, cx = rand(-9, 9), h = type === "tunnel" ? rand(14, 18) : rand(13, 22);
+    box(-SH, cx - hw, 0, 75); box(cx + hw, SH, 0, 75); box(cx - hw, cx + hw, h, 75);
+    o.safe = { x: cx, y: h * 0.5 + 0.5 };
+  } else if (type === "bridge") {      // beam: under or over
     const h = rand(10, 21);
     box(-SH, SH, h, h + 4); box(-SH, -SH + 4, 0, h); box(SH - 4, SH, 0, h);
     o.safe = h >= 13 ? { x: rand(-9, 9), y: h * 0.5 } : { x: rand(-9, 9), y: h + 10 };
-  } else if (type === "tower") {       // column: go around
+  } else if (type === "tower") {
     const cx = pick([-10, 0, 10]) + rand(-2, 2);
-    o.depth = 10; box(cx - 6, cx + 6, 0, 70);
+    box(cx - 6, cx + 6, 0, 75);
     o.safe = { x: cx > 2 ? cx - 14 : cx < -2 ? cx + 14 : pick([-14, 14]), y: rand(8, 22) };
-  } else if (type === "halfwall") {    // blocks one side of the street
+  } else if (type === "halfwall") {
     const side = pick([-1, 1]);
-    if (side < 0) box(-SH, 3, 0, 70); else box(-3, SH, 0, 70);
+    if (side < 0) box(-SH, 3, 0, 75); else box(-3, SH, 0, 75);
     o.safe = { x: -side * 12, y: rand(8, 22) };
-  } else if (type === "lowwall") {     // elevated track: go over
+  } else if (type === "lowwall") {
     const h = rand(8, 14);
     box(-SH, SH, 0, h);
     o.safe = { x: rand(-10, 10), y: h + 8 };
-  } else {                             // gate: thread the opening
+  } else {                             // gate
     const ox = rand(-9, 9), oy = rand(9, 22), hw = 10, hh = 6.5;
     box(-SH, ox - hw, 0, 46); box(ox + hw, SH, 0, 46); box(ox - hw, ox + hw, 0, oy - hh); box(ox - hw, ox + hw, oy + hh, 46);
     o.safe = { x: ox, y: oy };
   }
-  o.safe.x = clamp(o.safe.x, -XL + 2, XL - 2); o.safe.y = clamp(o.safe.y, FLOOR + 2.5, CEIL - 3);
+  o.safe.x = clamp(o.safe.x, -XL + 2, XL - 2); o.safe.y = clamp(o.safe.y, FLOOR + 2.2, CEIL - 3);
   scene.add(o.group); obstacles.push(o);
-  if (type === "gate" || Math.random() < 0.7) addRing(o.safe.x, o.safe.y, z);   // the ring shows the way through
+  if (type === "tunnel") { addRing(o.safe.x, o.safe.y, zFront - 1); addRing(o.safe.x, o.safe.y, zFront - depth + 1); }
+  else if (type === "gate" || type === "arch" || Math.random() < 0.6) addRing(o.safe.x, o.safe.y, z);   // the ring shows the way through
+  return depth;
 }
+
+/* ---------------- enemies ---------------- */
+function spawnEnemy(mode, z) {
+  const type = pick(["heli", "dragon", "ptero"]);
+  let model;
+  if (type === "heli") { const h = makeHeli(0x5a3f8a, 0xff4455, 0x1a0c30); model = { g: h.g, rot: h.rot, tail: h.tail }; }
+  else model = type === "dragon" ? makeDragon() : makePtero();
+  const side = pick([-1, 1]);
+  const e = { type, mode, ...model, side, x: 0, y: 0, z, t: rand(0, 6), phase: mode === "chase" ? "approach" : "hover", pt: 0, alive: true,
+              bx: rand(-10, 10), by: rand(7, 24), vy: 0, r: type === "dragon" ? 2.6 : 2.1 };
+  if (mode === "chase") { e.x = clamp(heliState.x + side * 10, -XL, XL); e.y = clamp(heliState.y + 3, 5, CEIL - 4); }
+  else { e.x = e.bx; e.y = e.by; e.g.rotation.y = Math.PI; }     // hoverers face you
+  scene.add(e.g); enemies.push(e);
+  return e;
+}
+function nextObstacleAhead(z) { for (const o of obstacles) if (o.z + o.depth / 2 < z) return o; return null; }
+function updateEnemies(dt) {
+  const hs = heliState;
+  for (const e of enemies) {
+    e.t += dt; e.pt += dt;
+    if (!e.alive) {                        // shot: tumble out of the sky
+      e.vy -= 45 * dt; e.y += e.vy * dt; e.z -= speed * 0.55 * dt;
+      e.g.rotation.x += 6 * dt; e.g.rotation.z += 8 * dt;
+      if (Math.random() < 0.5) burst(e.x, e.y, e.z, 1, 0.3);
+    } else if (e.mode === "hover") {       // waits ahead, weaving
+      e.z -= cruise * 0.18 * dt;
+      e.x = clamp(e.bx + Math.sin(e.t * 1.3) * 6, -XL, XL); e.y = clamp(e.by + Math.sin(e.t * 1.9) * 3, 4, CEIL - 3);
+    } else {                               // flies alongside you
+      let tx = e.x, ty = e.y;
+      const rel = e.z - hs.z;              // negative = ahead of you
+      if (e.phase === "approach") {
+        e.z -= (speed + 26) * dt; tx = hs.x + e.side * 10; ty = hs.y + 2;
+        if (rel < -6) { e.phase = "beside"; e.pt = 0; }
+      } else if (e.phase === "beside") {
+        e.z -= cruise * dt;                // holds cruise speed: brake and it slides ahead of you
+        tx = hs.x + e.side * Math.max(4.6, 9 - e.pt * 0.6); ty = hs.y + Math.sin(e.t * 2) * 1.5;
+        if (rel < -24 || e.pt > 11) { e.phase = "ahead"; e.pt = 0; }
+      } else if (e.phase === "ahead") {
+        e.z -= speed * dt; e.z += ((hs.z - 42) - e.z) * (1 - Math.exp(-dt / 0.5));   // keep pace, then settle 42 ahead
+        tx = hs.x * 0.5 + Math.sin(e.t * 1.6) * 7; ty = clamp(hs.y + Math.sin(e.t * 2.3) * 4, 5, CEIL - 4);
+        if (e.pt > 7) { e.phase = "leave"; e.pt = 0; }
+      } else { e.z -= (speed + 40) * dt; ty = e.y + 40; }
+      const o = nextObstacleAhead(e.z + 4);
+      if (o && e.phase !== "leave" && e.z - (o.z + o.depth / 2) < 90) { tx = o.safe.x + (e.phase === "beside" ? e.side * 1.5 : 0); ty = o.safe.y; }
+      const k = 1 - Math.exp(-dt / 0.35);
+      e.x = clamp(e.x + (tx - e.x) * k, -XL, XL); e.y = clamp(e.y + (ty - e.y) * k, 3, 90);
+      e.g.rotation.z = clamp((tx - e.x) * -0.08, -0.6, 0.6);
+    }
+    e.g.position.set(e.x, e.y, e.z);
+    if (e.wings) { const f = Math.sin(e.t * (e.type === "ptero" ? 7 : 9)) * 0.55; e.wings[0].rotation.z = f; e.wings[1].rotation.z = -f; }
+    if (e.rot) { e.rot.rotation.y += dt * 34; e.tail.rotation.x += dt * 44; }
+    if (e.alive && Math.abs(e.z - hs.z) < e.r + 1.5 && (e.x - hs.x) ** 2 + (e.y - hs.y) ** 2 < (e.r + 1.3) ** 2) {
+      killEnemy(e, false); bonk(null);
+    }
+  }
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (e.z > hs.z + 40 || e.y < -6 || e.y > 85) { scene.remove(e.g); enemies.splice(i, 1); }
+  }
+  if (dist > nextChaseAt && enemies.filter(e => e.mode === "chase" && e.alive).length < 2) {
+    spawnEnemy("chase", hs.z + 30);
+    nextChaseAt = dist + rand(900, 1500);
+  }
+}
+function killEnemy(e, byLaser) {
+  if (!e.alive) return;
+  e.alive = false; e.vy = 9;
+  burst(e.x, e.y, e.z, 30, 1.4);
+  if (byLaser) { kills++; flash("ZAP!", "", 350); }
+}
+
+/* ---------------- laser ---------------- */
+function fire() {
+  if (state !== "play" || laserT > 0) return;
+  laserT = 0.25; lastScorch.o = null;
+  if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+}
+function updateLaser(dt) {
+  if (laserT <= 0) { laser.visible = false; return; }
+  laserT -= dt;
+  const hs = heliState, sx = hs.x, sy = hs.y - 0.2, sz = hs.z - 2.2, RANGE = 320;
+  // first solid thing straight ahead
+  let block = null, blockZ = sz - RANGE;
+  for (const o of obstacles) {
+    const face = o.z + o.depth / 2;
+    if (o.hit || face > sz || face < sz - RANGE) continue;
+    if (o.boxes.some(b => sx > b.x0 && sx < b.x1 && sy > b.y0 && sy < b.y1)) { block = o; blockZ = face; break; }
+  }
+  // generous aim assist: nearest enemy inside a cone in front
+  let target = null;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const dzz = sz - e.z;
+    if (dzz < 2 || dzz > RANGE || e.z < blockZ) continue;
+    if (Math.hypot(e.x - sx, e.y - sy) < 5 + dzz * 0.07 && (!target || e.z > target.z)) target = e;
+  }
+  let ex = sx, ey = sy, ez = blockZ;
+  if (target) { ex = target.x; ey = target.y; ez = target.z; killEnemy(target, true); }
+  else if (block) {                    // scorch a black mark (a line, if you sweep) on whatever it hits
+    if (block.marks < 70 && (lastScorch.o !== block || Math.hypot(sx - lastScorch.x, sy - lastScorch.y) > 0.45)) {
+      const m = new THREE.Mesh(scorchGeo, scorchMat); m.frustumCulled = false;
+      m.position.set(sx, sy, blockZ + 0.06); m.scale.setScalar(rand(0.7, 1.15)); block.group.add(m); block.marks++;
+      lastScorch = { x: sx, y: sy, o: block };
+    }
+    burst(sx, sy, blockZ + 0.5, 2, 0.5);
+  }
+  laser.visible = true;
+  laser.position.set(sx, sy, sz); laser.lookAt(ex, ey, ez);
+  const len = Math.hypot(ex - sx, ey - sy, ez - sz);
+  laser.children[0].scale.z = len; laser.children[1].scale.z = len;
+}
+
 function bonk(o) {
-  o.hit = true; o.mat.opacity = 0.28; bonks++;
-  speed *= 0.45; shake = 1; bumpT = 0.4; bumpTo = o ? o.safe : null;
+  if (o) { o.hit = true; o.mat.opacity = 0.28; }
+  bonks++; speed *= 0.5; shake = 1;
+  if (o) { bumpT = 0.4; bumpTo = o.safe; }
   burst(heliState.x, heliState.y, heliState.z - 1.5, 36);
   if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) {} }
 }
 function update(dt, inp) {
   const hs = heliState;
-  const target = 38 + Math.min(1, dist / 1800) * 44;
-  speed += (target - speed) * (1 - Math.exp(-dt / 1.1));
-  hs.z -= speed * dt; dist += speed * dt;
+  brakeNow = inp.brake || 0;
+  cruise = BASE_SPEED + Math.min(1, dist / 2600) * (TOP_SPEED - BASE_SPEED);
+  const target = cruise * (1 - 0.62 * brakeNow);
+  speed += (target - speed) * (1 - Math.exp(-dt / (target < speed ? 0.45 : 1.0)));
+  prevZ = hs.z; hs.z -= speed * dt; dist += speed * dt;
+
+  // curves
+  if (dist > nextCurveAt) {
+    curveTarget = curveTarget !== 0 ? 0 : pick([-1, 1]) * pick([0.0011, 0.0015, MAXCURVE]);
+    nextCurveAt = dist + (curveTarget === 0 ? rand(300, 650) : rand(700, 1400));
+  }
+  curve += (curveTarget - curve) * (1 - Math.exp(-dt / 0.9));
+  bendU.value.set(curve, Math.sin(dist / 900) * 0.0003);
+  const push = -(curve / MAXCURVE) * 12 * (speed / 100);     // a turn throws you toward the outside wall
 
   if (feel === "fly") {
-    const k = 1 - Math.exp(-dt / 0.14);
+    const k = 1 - Math.exp(-dt / 0.11);
     hs.vx += (inp.sx * MAXVX - hs.vx) * k; hs.vy += (inp.sy * MAXVY - hs.vy) * k;
   } else {
-    hs.vx = clamp((inp.sx * XL - hs.x) * 6, -45, 45);
-    hs.vy = clamp((19 + inp.sy * 18 - hs.y) * 7, -60, 60);
+    hs.vx = clamp((inp.sx * XL - hs.x) * 8, -70, 70);
+    hs.vy = clamp((19 + inp.sy * 18 - hs.y) * 8, -70, 70);
   }
-  hs.x += hs.vx * dt; hs.y += hs.vy * dt;
+  hs.x += (hs.vx + push) * dt; hs.y += hs.vy * dt;
   if (bumpT > 0 && bumpTo) {            // after a bonk, get shoved toward the opening
     bumpT -= dt; const k = 1 - Math.exp(-dt / 0.1);
     hs.x += (bumpTo.x - hs.x) * k; hs.y += (bumpTo.y - hs.y) * k;
   }
-  if (Math.abs(hs.x) > XL) { if (Math.abs(hs.vx) > 12) { burst(hs.x + Math.sign(hs.x) * 1.5, hs.y, hs.z, 8); shake = Math.max(shake, 0.4); } hs.x = Math.sign(hs.x) * XL; hs.vx *= -0.4; }
-  if (hs.y < FLOOR) { if (hs.vy < -14) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
+  if (Math.abs(hs.x) > XL) { if (Math.abs(hs.vx) > 18) { burst(hs.x + Math.sign(hs.x) * 1.5, hs.y, hs.z, 8); shake = Math.max(shake, 0.4); } hs.x = Math.sign(hs.x) * XL; hs.vx *= -0.4; }
+  if (hs.y < FLOOR) { if (hs.vy < -18) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
   if (hs.y > CEIL) { hs.y = CEIL; hs.vy = Math.min(0, hs.vy); }
 
   const R = 1.3;
   for (const o of obstacles) {
-    if (o.hit || Math.abs(hs.z - o.z) > o.depth / 2 + 1.2) continue;
+    if (o.hit || hs.z > o.z + o.depth / 2 + 1.2 || prevZ < o.z - o.depth / 2 - 1.2) continue;   // swept, so nothing is skipped at speed
     for (const b of o.boxes) {
       const cx = clamp(hs.x, b.x0, b.x1), cy = clamp(hs.y, b.y0, b.y1);
       if ((hs.x - cx) ** 2 + (hs.y - cy) ** 2 < R * R) { bonk(o); break; }
@@ -480,29 +710,35 @@ function update(dt, inp) {
   for (const r of ringObjs) {
     if (!r.done && hs.z < r.z) {
       r.done = true;
-      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 3.6 * 3.6) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
+      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 3.7 * 3.7) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
     }
   }
+  updateEnemies(dt);
+  updateLaser(dt);
+
   // recycle and spawn
   for (const b of buildings) if (b.z > hs.z + 50) { b.z -= NSEG * SEG; dressBuilding(b); }
   for (const d of dashes) if (d.position.z > hs.z + 30) d.position.z -= dashes.length * 16;
-  while (obstacles.length && obstacles[0].z > hs.z + 30) { const o = obstacles.shift(); scene.remove(o.group); o.mat.dispose(); }
+  while (obstacles.length && obstacles[0].z - obstacles[0].depth / 2 > hs.z + 30) { const o = obstacles.shift(); scene.remove(o.group); o.mat.dispose(); }
   while (ringObjs.length && ringObjs[0].z > hs.z + 30) { scene.remove(ringObjs.shift().m); }
-  const gap = 95 - Math.min(1, dist / 2200) * 35;
-  while (nextObsZ > hs.z - 430) {
-    spawnObstacle(nextObsZ);
-    if (Math.random() < 0.35) addRing(rand(-12, 12), rand(6, 26), nextObsZ - gap / 2);
-    nextObsZ -= gap * rand(0.9, 1.2);
+  const gap = 175 - Math.min(1, dist / 3000) * 50;
+  while (nextObsZ > hs.z - VIEW - 20) {
+    const depth = spawnObstacle(nextObsZ);
+    const g = gap * rand(0.85, 1.2);
+    if (Math.random() < 0.55) spawnEnemy("hover", nextObsZ - depth - g * 0.5);
+    else if (Math.random() < 0.4) addRing(rand(-12, 12), rand(6, 26), nextObsZ - depth - g * 0.5);
+    nextObsZ -= depth + g;
   }
 }
 let camPos = null;
 function updateVisuals(dt, now) {
   const hs = heliState;
   heli.position.set(hs.x, hs.y + Math.sin(now / 400) * 0.12, hs.z);
-  const bank = clamp(hs.vx / MAXVX, -1.3, 1.3), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
-  heli.rotation.set(-0.12 + climb * 0.75, -bank * 0.25, -bank * 0.72);
+  const cv = curve / MAXCURVE;
+  const bank = clamp(hs.vx / MAXVX + cv * 0.45, -1.4, 1.4), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
+  heli.rotation.set(-0.12 + climb * 0.75 + brakeNow * 0.35, -bank * 0.25, -bank * 0.72);
   rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
-  buildWorld.ground.position.set(0, 0, hs.z - 300);
+  M.ground.position.set(0, 0, hs.z - 500);
 
   const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
   if (!camPos) camPos = { x: tx, y: ty };
@@ -510,16 +746,17 @@ function updateVisuals(dt, now) {
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * ky;
   shake *= Math.exp(-dt / 0.18);
   camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
-  camera.up.set(Math.sin(bank * 0.12), Math.cos(bank * 0.12), 0);
-  camera.lookAt(hs.x * 0.95, camPos.y - 1.3, hs.z - 34);
-  const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - 38) / 44, 0, 1) * 8;
+  const roll = bank * 0.1 + cv * 0.16;                     // lean into the turn
+  camera.up.set(Math.sin(roll), Math.cos(roll), 0);
+  camera.lookAt(hs.x * 0.95 + cv * 5, camPos.y - 1.3, hs.z - 34);
+  const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED), -0.6, 1) * 9;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
 
   const pos = sparkGeo.attributes.position.array;
   for (let i = 0; i < sparks.length; i++) {
     const s = sparks[i];
-    if (s.life > 0) { s.life -= dt; s.vy -= 22 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += (s.vz - speed) * dt; if (s.life <= 0) s.y = -999; }
+    if (s.life > 0) { s.life -= dt; s.vy -= 22 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += (s.vz - speed * 0.5) * dt; if (s.life <= 0) s.y = -999; }
     pos[i * 3] = s.x; pos[i * 3 + 1] = s.y; pos[i * 3 + 2] = s.z;
   }
   sparkGeo.attributes.position.needsUpdate = true;
@@ -533,10 +770,11 @@ function resize() {
 window.addEventListener("resize", resize);
 window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "play" && inputMode === "head") startCountdown(false); }, 350));
 
-let last = performance.now(), lastInp = { sx: 0, sy: 0 };
+let last = performance.now(), lastInp = { sx: 0, sy: 0, brake: 0 };
 function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (inputMode === "head") infer(now);
+  micTick(now);
   if (state === "count") stepCount(now);
   else if (state === "cal") stepCal(now);
   else if (state === "play") {
@@ -551,14 +789,17 @@ function tick(now) {
   }
   updateVisuals(dt, now);
   renderer.render(scene, camera);
-  $("gd-score").textContent = Math.floor(dist) + " m   ◎ " + rings + "   💥 " + bonks;
+  $("gd-score").textContent = Math.floor(dist) + " m   ◎ " + rings + "   ☠ " + kills + "   💥 " + bonks;
+  $("gd-brake").style.display = state === "play" && brakeNow > 0.25 ? "block" : "none";
   if (showDbg) {
     const n = v => (v >= 0 ? "+" : "") + v.toFixed(2);
     $("gd-debug").textContent = "v" + VERSION + " " + inputMode + " " + (inputMode === "head" ? delegate + " " + fps.toFixed(0) + "fps " + inferMs.toFixed(0) + "ms" : "") + "\n" +
       (pose ? "yaw" + n(pose.yaw) + " roll" + n(pose.roll) + " pitch" + n(pose.pitch) + "\n" +
-              "turn" + n(parts.t) + " tilt" + n(parts.r) + " nod" + n(parts.p) + "\n" : "") +
-      "signs " + signs.yaw + " " + signs.roll + " " + signs.pitch + "  range " + range.yaw.toFixed(2) + " " + range.roll.toFixed(2) + " " + range.pitch.toFixed(3) + "\n" +
-      "in x" + n(lastInp.sx) + " y" + n(lastInp.sy) + "  spd " + speed.toFixed(0);
+              "turn" + n(parts.t) + " tilt" + n(parts.r) + " nod" + n(parts.p) + "\n" +
+              "face dist " + pose.dist.toFixed(1) + " / " + (neutral.dist || 0).toFixed(1) + "  brake " + brakeNow.toFixed(2) + "\n" : "") +
+      "range " + range.yaw.toFixed(3) + " " + range.roll.toFixed(3) + " " + range.pitch.toFixed(3) + "\n" +
+      "in x" + n(lastInp.sx) + " y" + n(lastInp.sy) + "  spd " + speed.toFixed(0) + "  curve " + (curve / MAXCURVE).toFixed(2) + "\n" +
+      "mic " + (micOK ? micLevel.toFixed(3) + " / fire at " + micThr.toFixed(3) : "off (tap to fire)");
   }
   requestAnimationFrame(tick);
 }
@@ -571,12 +812,18 @@ async function makeLandmarker(vision, fileset, which) {
 }
 async function begin(mode) {
   $("gd-go").disabled = true; $("gd-touch").disabled = true;
+  // The audio context has to be created while we're still inside the tap.
+  if (mode === "head" && !FAKE) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; } }
   try {
     inputMode = mode;
     if (mode === "head" && !FAKE) {
-      statusEl.textContent = "Asking for the camera…";
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-      video.srcObject = stream; await video.play();
+      statusEl.textContent = "Asking for the camera and microphone…";
+      const vid = { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } };
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: vid, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+      catch (e) { stream = await navigator.mediaDevices.getUserMedia({ video: vid, audio: false }); }   // no mic: tap to fire instead
+      video.srcObject = new MediaStream(stream.getVideoTracks()); await video.play();
+      setupMic(stream);
       statusEl.textContent = "Loading face tracker…";
       const vision = await import(MP + "/vision_bundle.mjs");
       const fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
@@ -589,8 +836,8 @@ async function begin(mode) {
     try { await navigator.wakeLock?.request("screen"); } catch (e) {}
     $("gd-start").style.display = "none";
     $("gd-score").style.display = "block"; $("gd-gear").style.display = "block";
-    if (mode === "head") showIntro();
-    else { state = "play"; flash("GO!", "Drag to steer", 1200); $("gd-bar").style.display = "none"; }
+    if (mode === "head") { $("gd-rc").style.display = "block"; showIntro(); }
+    else { state = "play"; flash("GO!", "Drag to steer, tap to fire", 1400); $("gd-bar").style.display = "none"; }
     last = performance.now(); requestAnimationFrame(tick);
   } catch (e) {
     statusEl.textContent = "Couldn't start: " + (e && (e.message || e.name) || e);
@@ -600,7 +847,7 @@ async function begin(mode) {
 $("gd-go").addEventListener("click", () => begin("head"));
 $("gd-touch").addEventListener("click", () => begin("touch"));
 $("gd-gear").addEventListener("click", () => { const p = $("gd-panel"); p.style.display = p.style.display === "flex" ? "none" : "flex"; });
-$("gd-recenter").addEventListener("click", () => { if (raw) { neutral = { ...raw }; flash("Recentered", "", 600); } });
+$("gd-rc").addEventListener("click", recenter);
 $("gd-recal").addEventListener("click", () => { if (inputMode === "head") showIntro(); });
 $("gd-calgo").addEventListener("click", () => startCountdown(true));
 $("gd-steer").addEventListener("click", () => {
@@ -609,9 +856,13 @@ $("gd-steer").addEventListener("click", () => {
 });
 $("gd-feel").addEventListener("click", () => { feel = feel === "fly" ? "direct" : "fly"; $("gd-feel").textContent = "Feel: " + (feel === "fly" ? "Fly" : "Direct"); });
 $("gd-sens").addEventListener("input", e => { sens = parseFloat(e.target.value); });
+$("gd-mic").addEventListener("input", e => { micSens = parseFloat(e.target.value); });
 $("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
-if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, get: () => ({ state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, speed, obstacles: obstacles.length }) };
+if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -30 : 120)),
+  get: () => ({ state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, kills, speed, cruise, curve: curve / MAXCURVE, brake: brakeNow,
+    obstacles: obstacles.map(o => o.type), marks: obstacles.reduce((a, o) => a + o.marks, 0),
+    enemies: enemies.map(e => e.type + ":" + e.mode + ":" + e.phase + ":" + (e.alive ? "alive" : "dead") + ":" + Math.round(e.z - heliState.z)) }) };
 </script>
 </body>
 </html>
