@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.8</title>
+<title>Chopper Run v0.10</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -26,6 +26,8 @@
   #gd-score { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 0; right: 0; text-align: center;
     font-size: 16px; font-weight: 700; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none;
     font-variant-numeric: tabular-nums; }
+  #gd-cue { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 96px; line-height: 1; font-weight: 900;
+    color: #ffd24a; text-shadow: 0 2px 14px #000, 0 0 4px #000; z-index: 3; pointer-events: none; display: none; }
   #gd-brake { position: fixed; left: 0; right: 0; bottom: 22%; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: 3px;
     color: #ffcf7f; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none; }
   .gd-corner { position: fixed; top: calc(env(safe-area-inset-top) + 4px); z-index: 5; display: none;
@@ -69,10 +71,10 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.8</div>
+  <div id="gd-ver">v0.10</div>
   <p>Fly a helicopter through the city with your head. Small moves: turn or tilt to bank, chin up to climb, chin down to dive.</p>
-  <p>Lean back from the phone to brake. Shout “pew!” (or tap) to fire the laser.</p>
-  <p>Uses the front camera and microphone; nothing leaves your phone.</p>
+  <p>Every gap is at an edge or a corner. Follow the big arrow and slam the chopper there. Lean back to brake. Shout “pew!” (or tap) to fire.</p>
+  <p>Sound on for music. Uses the front camera and microphone; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
   <button id="gd-touch">Play with touch instead</button>
   <div id="gd-status"></div>
@@ -107,6 +109,7 @@
 </div>
 
 <div id="gd-score"></div>
+<div id="gd-cue"></div>
 <div id="gd-brake">BRAKING</div>
 <button id="gd-rc" class="gd-corner">⌖</button>
 <button id="gd-gear" class="gd-corner">⚙</button>
@@ -115,15 +118,17 @@
   <button id="gd-feel">Feel: Fly</button>
   <label>Sens <input id="gd-sens" type="range" min="0.4" max="3" step="0.05" value="1"></label>
   <label>Mic <input id="gd-mic" type="range" min="0.3" max="3" step="0.05" value="1"></label>
+  <button id="gd-sound">Sound: All</button>
+  <button id="gd-echo">Echo cancel: On</button>
   <button id="gd-recal">Recalibrate</button>
   <button id="gd-dbgbtn">Debug</button>
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.8</div>
+<div id="gd-tag">v0.10</div>
 
 <script type="module">
-const VERSION = "0.8";
+const VERSION = "0.10";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -223,27 +228,119 @@ function touchInput() {
   return (kx || ky) ? { sx: kx, sy: ky, brake: b } : { ...touchIn, brake: b };
 }
 
-/* ---------------- microphone: a loud "pew!" fires ---------------- */
-let audioCtx = null, analyser = null, micBuf = null, micFloor = 0.01, micLevel = 0, micThr = 0, lastPew = 0, micSens = 1, micOK = false;
+/* ---------------- audio: output buses, "pew" detector, music, sound effects ---------------- */
+let audioCtx = null, master = null, musicBus = null, sfxBus = null, echoBus = null, outAn = null, outBuf = null, noiseBuf = null;
+let analyser = null, micBuf = null, micStream = null, micFloor = 0, micLevel = 0, micThr = 0, lastPew = 0, micSens = 1, micOK = false,
+    micWasOver = false, outHold = 0, leak = 0.15, micLearnUntil = 0, micMuteUntil = 0, fires = 0;
+let soundMode = "all", echoCancel = true;
+try { soundMode = localStorage.getItem("gd-sound") || "all"; echoCancel = localStorage.getItem("gd-echo") !== "off"; } catch (e) {}
+const BPM = 128, STEP = 60 / BPM / 4;
+function initAudio() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; return; }
+  const c = audioCtx, comp = c.createDynamicsCompressor();
+  master = c.createGain(); master.gain.value = 0.9; master.connect(comp); comp.connect(c.destination);
+  musicBus = c.createGain(); musicBus.connect(master); sfxBus = c.createGain(); sfxBus.connect(master);
+  const dl = c.createDelay(1), fb = c.createGain(), wet = c.createGain();      // tempo echo for stabs and lead
+  dl.delayTime.value = STEP * 3; fb.gain.value = 0.38; wet.gain.value = 0.3;
+  echoBus = c.createGain(); echoBus.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(musicBus);
+  outAn = c.createAnalyser(); outAn.fftSize = 1024; outAn.smoothingTimeConstant = 0; master.connect(outAn);
+  outBuf = new Float32Array(outAn.frequencyBinCount);
+  noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  analyser = c.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0;
+  micBuf = new Float32Array(analyser.frequencyBinCount);
+  applySoundMode();
+}
+function applySoundMode() {
+  if (!audioCtx) return;
+  musicBus.gain.value = soundMode === "all" ? 0.5 : 0; sfxBus.gain.value = soundMode === "off" ? 0 : 0.9;
+  $("gd-sound").textContent = "Sound: " + (soundMode === "all" ? "All" : soundMode === "sfx" ? "SFX only" : "Off");
+}
+const micConstraints = () => ({ echoCancellation: echoCancel, noiseSuppression: echoCancel, autoGainControl: echoCancel });
 function setupMic(stream) {
   try {
     if (!audioCtx || !stream.getAudioTracks().length) return;
-    analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0;
-    audioCtx.createMediaStreamSource(stream).connect(analyser);
-    micBuf = new Float32Array(analyser.fftSize);
+    micStream = stream;
+    audioCtx.createMediaStreamSource(new MediaStream(stream.getAudioTracks())).connect(analyser);
     if (audioCtx.state !== "running") audioCtx.resume();
     micOK = true;
   } catch (e) { micOK = false; }
 }
+// Loudness in the voice band only (400-3500 Hz), so rumble and wind count for less than a shouted word.
+function bandLevel(an, buf) {
+  an.getFloatFrequencyData(buf);
+  const hz = audioCtx.sampleRate / an.fftSize, a = Math.max(1, Math.round(400 / hz)), b = Math.min(buf.length - 1, Math.round(3500 / hz));
+  let p = 0; for (let i = a; i <= b; i++) { const v = buf[i]; if (v > -140) p += Math.pow(10, v / 10); }
+  return Math.sqrt(p);
+}
 function micTick(now) {
   if (!micOK) return;
-  analyser.getFloatTimeDomainData(micBuf);
-  let s = 0; for (let i = 0; i < micBuf.length; i++) s += micBuf[i] * micBuf[i];
-  micLevel = Math.sqrt(s / micBuf.length);
-  micThr = Math.max(0.05, micFloor * 4) / micSens;
-  if (micLevel > micThr && now - lastPew > 330 && state === "play") { lastPew = now; fire(); }
-  micFloor += (micLevel - micFloor) * (micLevel < micFloor ? 0.2 : 0.008);   // background level: falls fast, rises slowly
+  micLevel = bandLevel(analyser, micBuf);
+  outHold = Math.max(bandLevel(outAn, outBuf), outHold * 0.88);              // what the game itself is playing right now
+  // Fire on a sudden sound well above the background AND above the game's own sound leaking into the mic.
+  const learning = now < micLearnUntil;                                       // first two seconds of music: listen, don't fire
+  micThr = Math.max(0.0006, micFloor * 3, outHold * leak * 1.7) / micSens;
+  const over = micLevel > micThr;
+  if (over && !micWasOver && !learning && now - lastPew > 330 && now > micMuteUntil && state === "play") { lastPew = now; fire(); }
+  micWasOver = over;
+  // "leak" = how loud the game's own sound is at the mic, as a ratio. Rises fast, falls slowly. After the learning window,
+  // anything far above the current estimate is treated as a voice, not as leak, so a pew doesn't raise the bar for the next one.
+  if (outHold > 0.002) {
+    const ratio = Math.min(micLevel / outHold, 4);
+    if (learning || ratio <= leak * 3) leak += (ratio - leak) * (ratio > leak ? 0.3 : learning ? 0.1 : 0.004);
+  }
+  micFloor += (micLevel - micFloor) * (micLevel < micFloor ? 0.2 : 0.012);   // background level: falls fast, rises slowly
 }
+function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function tone(type, f0, f1, t, dur, peak, dest, detune, cutoff) {
+  const c = audioCtx, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  if (detune) o.detune.value = detune;
+  env(g, t, 0.004, peak, dur);
+  if (cutoff) { const f = c.createBiquadFilter(); f.type = "lowpass"; f.Q.value = 4; f.frequency.setValueAtTime(cutoff, t); f.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.25), t + dur); o.connect(f); f.connect(g); }
+  else o.connect(g);
+  g.connect(dest); o.start(t); o.stop(t + dur + 0.06);
+}
+function noise(t, dur, peak, ftype, f0, f1, q, dest) {
+  const c = audioCtx, src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = noiseBuf; src.loop = true; f.type = ftype; f.Q.value = q; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, 0.002, peak, dur); src.connect(f); f.connect(g); g.connect(dest); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.06);
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+// 16-bar loop in A minor: Am Am F G / Am Am F E. Four-on-the-floor kick, clap, hats, octave-jumping bass, chord stabs, a lead in the second half.
+const CHORDS = [[45, 3], [45, 3], [41, 4], [43, 4], [45, 3], [45, 3], [41, 4], [40, 4]];
+const BASS = [0, 0, 12, 0, 0, 12, 0, 12, 0, 0, 12, 0, 7, 12, 0, 12];
+const LEAD = [[76, 0, 79, 76, 0, 74, 72, 0], [74, 0, 76, 0, 72, 0, 69, 0], [72, 0, 76, 72, 0, 69, 0, 72], [74, 0, 79, 0, 74, 71, 0, 74],
+              [76, 0, 79, 81, 0, 79, 76, 0], [79, 0, 76, 0, 74, 0, 72, 0], [77, 0, 76, 72, 0, 69, 0, 72], [71, 0, 76, 0, 80, 76, 0, 83]];
+let musicOn = false, nextStepT = 0, stepN = 0;
+function scheduleStep(n, t) {
+  const bar = Math.floor(n / 16) % 16, st = n % 16, [root, third] = CHORDS[bar % 8], intro = n < 32;
+  if (st % 4 === 0) tone("sine", 150, 45, t, 0.22, 0.95, musicBus);
+  if (!intro && (st === 4 || st === 12)) { noise(t, 0.16, 0.34, "bandpass", 1800, 1800, 0.8, musicBus); noise(t + 0.012, 0.1, 0.2, "bandpass", 2400, 2400, 1, musicBus); }
+  noise(t, st % 4 === 2 ? 0.07 : 0.03, st % 4 === 2 ? 0.16 : 0.05, "highpass", 7000, 7000, 0.7, musicBus);
+  tone("sawtooth", mtof(root - 12 + BASS[st]), mtof(root - 12 + BASS[st]), t, STEP * 0.9, 0.3, musicBus, 0, 900);
+  if (!intro && (st === 3 || st === 6 || st === 11 || st === 14)) for (const iv of [0, third, 7]) for (const dt of [-9, 9]) {
+    const g = audioCtx.createGain(); g.gain.value = 1; g.connect(musicBus); g.connect(echoBus);
+    tone("sawtooth", mtof(root + 12 + iv), mtof(root + 12 + iv), t, 0.16, 0.035, g, dt, 2600);
+  }
+  if (bar >= 8 && st % 2 === 0) { const m = LEAD[bar % 8][st / 2]; if (m) { const g = audioCtx.createGain(); g.connect(musicBus); g.connect(echoBus); tone("square", mtof(m), mtof(m), t, 0.2, 0.07, g, 0, 3200); } }
+}
+function startMusic() {
+  if (!audioCtx || musicOn) return;
+  if (audioCtx.state !== "running") audioCtx.resume();
+  musicOn = true; nextStepT = audioCtx.currentTime + 0.12; stepN = 0; micLearnUntil = performance.now() + 2200;
+  setInterval(() => { while (nextStepT < audioCtx.currentTime + 0.14) { scheduleStep(stepN++, nextStepT); nextStepT += STEP; } }, 30);
+}
+const sfx = {
+  laser() { const t = audioCtx.currentTime; tone("sawtooth", 2400, 160, t, 0.25, 0.3, sfxBus); tone("square", 1800, 120, t, 0.22, 0.12, sfxBus, 14); },
+  bonk() { const t = audioCtx.currentTime; noise(t, 0.3, 0.6, "lowpass", 1200, 200, 0.7, sfxBus); tone("sine", 120, 38, t, 0.3, 0.7, sfxBus); },
+  ring() { const t = audioCtx.currentTime; tone("triangle", 1047, 1047, t, 0.09, 0.22, sfxBus); tone("triangle", 1568, 1568, t + 0.07, 0.16, 0.22, sfxBus); },
+  kill() { const t = audioCtx.currentTime; noise(t, 0.5, 0.5, "bandpass", 2200, 180, 0.9, sfxBus); tone("sawtooth", 420, 50, t, 0.5, 0.3, sfxBus, 0, 1800); },
+  whoosh() { const t = audioCtx.currentTime; noise(t, 0.2, 0.16, "bandpass", 500, 1900, 1.2, sfxBus); },
+  beep(f, d) { const t = audioCtx.currentTime; tone("square", f, f, t, d || 0.09, 0.16, sfxBus, 0, 3000); },
+};
+const play = (name, ...a) => { if (audioCtx && soundMode !== "off") { try { sfx[name](...a); } catch (e) {} } };
 
 /* ---------------- calibration ---------------- */
 const CAL_FULL = [
@@ -270,7 +367,7 @@ function stepCal(now) {
   if (t > SETTLE + SAMPLE) {
     if (calN < 3) { beginCalStep(); return; }
     const got = {}; for (const a in calSum) got[a] = calSum[a] / calN;
-    calGot[s.k] = got; calIdx++;
+    calGot[s.k] = got; calIdx++; play("beep", 880);
     if (calIdx < calSteps.length) { beginCalStep(); return; }
     neutral = calGot.c;
     if (calGot.turn) {
@@ -285,7 +382,7 @@ function stepCal(now) {
     }
     pose = raw ? { ...raw } : pose;
     $("gd-bar").style.display = "none";
-    state = "play"; flash("GO!", "", 900);
+    state = "play"; flash("GO!", "", 900); play("beep", 1320, 0.3); startMusic();
   }
 }
 let countT0 = 0, countFull = true;
@@ -303,7 +400,7 @@ function startCountdown(full) {
 function stepCount(now) {
   const left = 3 - Math.floor((now - countT0) / 1000);
   if (left <= 0) { $("gd-msg").classList.remove("gd-center"); startCal(countFull); }
-  else $("gd-msgtext").textContent = "Calibration in " + left + "…";
+  else { const txt = "Calibration in " + left + "…"; if ($("gd-msgtext").textContent !== txt) { $("gd-msgtext").textContent = txt; play("beep", 660); } }
 }
 let flashUntil = 0;
 function flash(text, sub, ms) {
@@ -316,8 +413,8 @@ const SH = 22;                 // half-width of the street canyon
 const XL = SH - 2.4;           // how far the chopper can go sideways
 const FLOOR = 1.6, CEIL = 38;
 const MAXVX = 60, MAXVY = 60;
-const SEG = 26, NSEG = 46, VIEW = 1100;
-const BASE_SPEED = 228, TOP_SPEED = 492;
+const SEG = 26, NSEG = 62, VIEW = 1500;
+const BASE_SPEED = 342, TOP_SPEED = 738;
 const MAXCURVE = 0.0034, BEND_Z0 = 520;
 let heli, rotor, tailRotor, heliState, speed = 0, cruise = BASE_SPEED, dist = 0, rings = 0, bonks = 0, kills = 0, shake = 0, bumpT = 0, bumpTo = null;
 let buildings = [], dashes = [], obstacles = [], ringObjs = [], enemies = [], nextObsZ = 0, nextChaseAt = 0, prevZ = 0;
@@ -419,7 +516,7 @@ function buildWorld() {
   scene.fog = new THREE.Fog(0x8a4a78, 140, VIEW);
   scene.add(new THREE.HemisphereLight(0xaab4ff, 0x2a1838, 1.5));
   const sun = new THREE.DirectionalLight(0xffb37a, 1.6); sun.position.set(-0.5, 0.8, -1); scene.add(sun);
-  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 1600);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 2100);
 
   unitBox = new THREE.BoxGeometry(1, 1, 1);
   segBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 40);   // long things need extra slices so they follow the curve
@@ -435,10 +532,10 @@ function buildWorld() {
   M.pteroMem = lam({ color: 0x8a5a3a, emissive: 0x1a0c04, side: THREE.DoubleSide });
   M.pteroWing = wingGeo(5.6, 1.9);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 2800, 1, 140), lam({ color: 0x181b26 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 3800, 1, 190), lam({ color: 0x181b26 }));
   ground.rotation.x = -Math.PI / 2; ground.frustumCulled = false; scene.add(ground); M.ground = ground;
   const dashMat = bas({ color: 0xf2e9b0 });
-  for (let i = 0; i < 80; i++) { const d = mesh(unitBox, dashMat, 0.7, 0.05, 6, 0, 0.03, 40 - i * 16, scene); dashes.push(d); }
+  for (let i = 0; i < 100; i++) { const d = mesh(unitBox, dashMat, 0.7, 0.05, 6, 0, 0.03, 40 - i * 16, scene); dashes.push(d); }
 
   const tints = [0x8f9bd6, 0xb08fd0, 0x7fb0c8, 0xd09a8f, 0x9aa0b4];
   for (let i = 0; i < 5; i++) {
@@ -484,7 +581,7 @@ function resetRun() {
   for (const o of obstacles) scene.remove(o.group); obstacles = [];
   for (const r of ringObjs) scene.remove(r.m); ringObjs = [];
   for (const e of enemies) scene.remove(e.g); enemies = [];
-  nextObsZ = -620; nextChaseAt = 1400; curve = 0; curveTarget = 0; nextCurveAt = 500;
+  nextObsZ = -950; nextChaseAt = 2200; curve = 0; curveTarget = 0; nextCurveAt = 800; lastRegions = [];
 }
 function burst(x, y, z, n, spread) {
   const k = spread || 1;
@@ -498,53 +595,40 @@ function addRing(x, y, z) {
   const m = new THREE.Mesh(ringGeo, ringMat); m.position.set(x, y, z); m.frustumCulled = false; scene.add(m);
   ringObjs.push({ m, x, y, z, done: false });
 }
-const OB_COLORS = { duck: 0x4fd1c5, arch: 0xff7eb6, tunnel: 0x56607e, bridge: 0x4fd1c5, tower: 0xff7eb6, halfwall: 0xb79bff, lowwall: 0xffa24a, gate: 0x7fd4ff };
+// Every opening is at an extreme of the flight space, because that's where the chopper can reliably be sent:
+// the top band, the bottom band, the whole left or right side, or one of the four corners.
+const REGIONS = {
+  top:    { cue: "↑", safe: [0, 33],   blocks: [[-SH, SH, 0, 26]] },
+  bottom: { cue: "↓", safe: [0, 5.5],  blocks: [[-SH, SH, 12, 75]] },
+  left:   { cue: "←", safe: [-12, 19], blocks: [[-1, SH, 0, 75]] },
+  right:  { cue: "→", safe: [12, 19],  blocks: [[-SH, 1, 0, 75]] },
+  tl:     { cue: "↖", safe: [-12, 31], blocks: [[-1, SH, 0, 75], [-SH, -1, 0, 21]] },
+  tr:     { cue: "↗", safe: [12, 31],  blocks: [[-SH, 1, 0, 75], [1, SH, 0, 21]] },
+  bl:     { cue: "↙", safe: [-12, 7.5], blocks: [[-1, SH, 0, 75], [-SH, -1, 17, 75]] },
+  br:     { cue: "↘", safe: [12, 7.5],  blocks: [[-SH, 1, 0, 75], [1, SH, 17, 75]] },
+};
+const OB_PALETTE = [0x4fd1c5, 0xff7eb6, 0xb79bff, 0xffa24a, 0x7fd4ff, 0x9be36a];
+let lastRegions = [];
 function spawnObstacle(zFront) {
-  // weighted toward things you fly under or squeeze through
-  let types = ["duck", "duck", "duck", "arch", "arch", "arch", "tunnel", "tunnel", "bridge", "tower", "halfwall", "lowwall"];
-  if (dist > 500) types = types.concat(["gate", "tunnel", "arch"]);
-  const type = pick(types);
-  const depth = type === "tunnel" ? cruise * rand(0.9, 1.5) : type === "duck" ? 34 : type === "arch" || type === "tower" ? 26 : 18;
+  let names = ["top", "bottom", "left", "right"];
+  if (dist > 1500) names = names.concat(["tl", "tr", "bl", "br"]);          // corners come in once you've warmed up
+  if (lastRegions.length >= 2 && lastRegions[0] === lastRegions[1]) names = names.filter(n => n !== lastRegions[0]);
+  const region = pick(names); lastRegions = [region, lastRegions[0]];
+  const R0 = REGIONS[region];
+  const long = Math.random() < 0.22;                                        // a tunnel: the same opening, held for a while
+  const depth = long ? cruise * rand(0.7, 1.2) : 30;
   const z = zFront - depth / 2;
-  const mat = lam({ color: OB_COLORS[type], emissive: OB_COLORS[type], emissiveIntensity: type === "tunnel" ? 0.12 : 0.25, transparent: true });
-  const o = { type, group: new THREE.Group(), boxes: [], z, depth, hit: false, mat, safe: { x: 0, y: 14 }, marks: 0 };
-  const box = (x0, x1, y0, y1) => {
-    mesh(depth > 30 ? segBox : unitBox, mat, x1 - x0, y1 - y0, depth, (x0 + x1) / 2, (y0 + y1) / 2, z, o.group);
+  const col = long ? 0x56607e : pick(OB_PALETTE);
+  const mat = lam({ color: col, emissive: col, emissiveIntensity: long ? 0.12 : 0.25, transparent: true });
+  const o = { type: region + (long ? "-tunnel" : ""), region, cue: R0.cue, group: new THREE.Group(), boxes: [], z, depth, hit: false, mat,
+              safe: { x: R0.safe[0], y: R0.safe[1] }, marks: 0 };
+  for (const [x0, x1, y0, y1] of R0.blocks) {
+    mesh(long ? segBox : unitBox, mat, x1 - x0, y1 - y0, depth, (x0 + x1) / 2, (y0 + y1) / 2, z, o.group);
     o.boxes.push({ x0, x1, y0, y1 });
-  };
-  if (type === "duck") {               // a building bridging the street: duck under
-    const h = rand(7.5, 11);
-    box(-SH, SH, h, 75);
-    o.safe = { x: rand(-10, 10), y: h * 0.5 };
-  } else if (type === "arch" || type === "tunnel") {   // an opening to thread; a tunnel is a long one
-    const hw = type === "tunnel" ? 8 : 9, cx = rand(-9, 9), h = type === "tunnel" ? rand(14, 18) : rand(13, 22);
-    box(-SH, cx - hw, 0, 75); box(cx + hw, SH, 0, 75); box(cx - hw, cx + hw, h, 75);
-    o.safe = { x: cx, y: h * 0.5 + 0.5 };
-  } else if (type === "bridge") {      // beam: under or over
-    const h = rand(10, 21);
-    box(-SH, SH, h, h + 4); box(-SH, -SH + 4, 0, h); box(SH - 4, SH, 0, h);
-    o.safe = h >= 13 ? { x: rand(-9, 9), y: h * 0.5 } : { x: rand(-9, 9), y: h + 10 };
-  } else if (type === "tower") {
-    const cx = pick([-10, 0, 10]) + rand(-2, 2);
-    box(cx - 6, cx + 6, 0, 75);
-    o.safe = { x: cx > 2 ? cx - 14 : cx < -2 ? cx + 14 : pick([-14, 14]), y: rand(8, 22) };
-  } else if (type === "halfwall") {
-    const side = pick([-1, 1]);
-    if (side < 0) box(-SH, 3, 0, 75); else box(-3, SH, 0, 75);
-    o.safe = { x: -side * 12, y: rand(8, 22) };
-  } else if (type === "lowwall") {
-    const h = rand(8, 14);
-    box(-SH, SH, 0, h);
-    o.safe = { x: rand(-10, 10), y: h + 8 };
-  } else {                             // gate
-    const ox = rand(-9, 9), oy = rand(9, 22), hw = 10, hh = 6.5;
-    box(-SH, ox - hw, 0, 46); box(ox + hw, SH, 0, 46); box(ox - hw, ox + hw, 0, oy - hh); box(ox - hw, ox + hw, oy + hh, 46);
-    o.safe = { x: ox, y: oy };
   }
-  o.safe.x = clamp(o.safe.x, -XL + 2, XL - 2); o.safe.y = clamp(o.safe.y, FLOOR + 2.2, CEIL - 3);
   scene.add(o.group); obstacles.push(o);
-  if (type === "tunnel") { addRing(o.safe.x, o.safe.y, zFront - 1); addRing(o.safe.x, o.safe.y, zFront - depth + 1); }
-  else if (type === "gate" || type === "arch" || Math.random() < 0.6) addRing(o.safe.x, o.safe.y, z);   // the ring shows the way through
+  addRing(o.safe.x, o.safe.y, zFront + 2);                                  // the ring marks the opening
+  if (long) addRing(o.safe.x, o.safe.y, zFront - depth + 1);
   return depth;
 }
 
@@ -556,7 +640,7 @@ function spawnEnemy(mode, z) {
   else model = type === "dragon" ? makeDragon() : makePtero();
   const side = pick([-1, 1]);
   const e = { type, mode, ...model, side, x: 0, y: 0, z, t: rand(0, 6), phase: mode === "chase" ? "approach" : "hover", pt: 0, alive: true,
-              bx: rand(-9, 9), by: rand(9, 24), vy: 0, r: type === "dragon" ? 4.2 : 3.4 };
+              bx: rand(-5, 5), by: rand(14, 24), vy: 0, r: type === "dragon" ? 4.2 : 3.4 };
   if (mode === "chase") { e.x = clamp(heliState.x + side * 13, -XL, XL); e.y = clamp(heliState.y + 4, 6, CEIL - 4); }
   else { e.x = e.bx; e.y = e.by; e.g.rotation.y = Math.PI; }     // hoverers face you
   scene.add(e.g); enemies.push(e);
@@ -615,19 +699,19 @@ function killEnemy(e, byLaser) {
   if (!e.alive) return;
   e.alive = false; e.vy = 9;
   burst(e.x, e.y, e.z, 30, 1.4);
-  if (byLaser) { kills++; flash("ZAP!", "", 350); }
+  if (byLaser) { kills++; flash("ZAP!", "", 350); play("kill"); }
 }
 
 /* ---------------- laser ---------------- */
 function fire() {
   if (state !== "play" || laserT > 0) return;
-  laserT = 0.25; lastScorch.o = null;
+  laserT = 0.25; lastScorch.o = null; fires++; play("laser"); micMuteUntil = performance.now() + 150;
   if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
 }
 function updateLaser(dt) {
   if (laserT <= 0) { laser.visible = false; return; }
   laserT -= dt;
-  const hs = heliState, sx = hs.x, sy = hs.y - 0.2, sz = hs.z - 2.2, RANGE = 800;
+  const hs = heliState, sx = hs.x, sy = hs.y - 0.2, sz = hs.z - 2.2, RANGE = 1100;
   // first solid thing straight ahead
   let block = null, blockZ = sz - RANGE;
   for (const o of obstacles) {
@@ -661,7 +745,7 @@ function updateLaser(dt) {
 
 function bonk(o) {
   if (o) { o.hit = true; o.mat.opacity = 0.28; }
-  bonks++; speed *= 0.5; shake = 1;
+  bonks++; speed *= 0.5; shake = 1; play("bonk");
   if (o) { bumpT = 0.4; bumpTo = o.safe; }
   burst(heliState.x, heliState.y, heliState.z - 1.5, 36);
   if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) {} }
@@ -669,7 +753,7 @@ function bonk(o) {
 function update(dt, inp) {
   const hs = heliState;
   brakeNow = inp.brake || 0;
-  cruise = BASE_SPEED + Math.min(1, dist / 9000) * (TOP_SPEED - BASE_SPEED);
+  cruise = BASE_SPEED + Math.min(1, dist / 14000) * (TOP_SPEED - BASE_SPEED);
   const target = cruise * (1 - 0.62 * brakeNow);
   speed += (target - speed) * (1 - Math.exp(-dt / (target < speed ? 0.45 : 1.0)));
   prevZ = hs.z; hs.z -= speed * dt; dist += speed * dt;
@@ -683,7 +767,7 @@ function update(dt, inp) {
   }
   curve += (curveTarget - curve) * (1 - Math.exp(-dt / 0.7));
   bendU.value.set(curve, Math.sin(dist / 2600) * 0.00022);
-  const push = -(curve / MAXCURVE) * 0.42 * MAXVX * clamp(speed / BASE_SPEED, 0.3, 1);     // a turn throws you toward the outside wall
+  const push = 0;   // curves are for the eyes only: a neutral head never moves the chopper     // a turn throws you toward the outside wall
 
   if (feel === "fly") {
     const k = 1 - Math.exp(-dt / 0.11);
@@ -697,12 +781,13 @@ function update(dt, inp) {
     bumpT -= dt; const k = 1 - Math.exp(-dt / 0.1);
     hs.x += (bumpTo.x - hs.x) * k; hs.y += (bumpTo.y - hs.y) * k;
   }
-  if (Math.abs(hs.x) > XL) { if (Math.abs(hs.vx) > 18) { burst(hs.x + Math.sign(hs.x) * 1.5, hs.y, hs.z, 8); shake = Math.max(shake, 0.4); } hs.x = Math.sign(hs.x) * XL; hs.vx *= -0.4; }
-  if (hs.y < FLOOR) { if (hs.vy < -18) { burst(hs.x, 0.3, hs.z, 8); shake = Math.max(shake, 0.4); } hs.y = FLOOR; hs.vy = Math.abs(hs.vy) * 0.3; }
+  if (Math.abs(hs.x) > XL) { hs.x = Math.sign(hs.x) * XL; if (hs.vx * hs.x > 0) hs.vx = 0; }
+  if (hs.y < FLOOR) { hs.y = FLOOR; hs.vy = Math.max(0, hs.vy); }
   if (hs.y > CEIL) { hs.y = CEIL; hs.vy = Math.min(0, hs.vy); }
 
   const R = 1.3;
   for (const o of obstacles) {
+    if (!o.hit && !o.passed && hs.z < o.z + o.depth / 2 - 3) { o.passed = true; play("whoosh"); }
     if (o.hit || hs.z > o.z + o.depth / 2 + 1.2 || prevZ < o.z - o.depth / 2 - 1.2) continue;   // swept, so nothing is skipped at speed
     for (const b of o.boxes) {
       const cx = clamp(hs.x, b.x0, b.x1), cy = clamp(hs.y, b.y0, b.y1);
@@ -712,7 +797,7 @@ function update(dt, inp) {
   for (const r of ringObjs) {
     if (!r.done && hs.z < r.z) {
       r.done = true;
-      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 4.7 * 4.7) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
+      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 4.7 * 4.7) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); play("ring"); }
     }
   }
   updateEnemies(dt);
@@ -723,12 +808,12 @@ function update(dt, inp) {
   for (const d of dashes) if (d.position.z > hs.z + 30) d.position.z -= dashes.length * 16;
   while (obstacles.length && obstacles[0].z - obstacles[0].depth / 2 > hs.z + 30) { const o = obstacles.shift(); scene.remove(o.group); o.mat.dispose(); }
   while (ringObjs.length && ringObjs[0].z > hs.z + 30) { scene.remove(ringObjs.shift().m); }
-  const gap = cruise * (1.55 - Math.min(1, dist / 12000) * 0.35);   // about a second and a half between obstacles
+  const gap = cruise * (1.7 - Math.min(1, dist / 20000) * 0.35);   // well over a second between obstacles
   while (nextObsZ > hs.z - VIEW - 20) {
     const depth = spawnObstacle(nextObsZ);
     const g = gap * rand(0.85, 1.2);
     if (Math.random() < 0.55) spawnEnemy("hover", nextObsZ - depth - g * 0.5);
-    else if (Math.random() < 0.4) addRing(rand(-12, 12), rand(6, 26), nextObsZ - depth - g * 0.5);
+    
     nextObsZ -= depth + g;
   }
 }
@@ -737,10 +822,10 @@ function updateVisuals(dt, now) {
   const hs = heliState;
   heli.position.set(hs.x, hs.y + Math.sin(now / 400) * 0.12, hs.z);
   const cv = curve / MAXCURVE;
-  const bank = clamp(hs.vx / MAXVX + cv * 0.45, -1.4, 1.4), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
+  const bank = clamp(hs.vx / MAXVX + cv * 0.2, -1.4, 1.4), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
   heli.rotation.set(-0.12 + climb * 0.75 + brakeNow * 0.35, -bank * 0.25, -bank * 0.72);
   rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
-  M.ground.position.set(0, 0, hs.z - 1050);
+  M.ground.position.set(0, 0, hs.z - 1500);
 
   const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
   if (!camPos) camPos = { x: tx, y: ty };
@@ -750,7 +835,7 @@ function updateVisuals(dt, now) {
   camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
   const roll = bank * 0.1 + cv * 0.24;                     // lean into the turn
   camera.up.set(Math.sin(roll), Math.cos(roll), 0);
-  camera.lookAt(hs.x * 0.95 + cv * 9, camPos.y - 1.3, hs.z - 34);
+  camera.lookAt(hs.x * 0.95, camPos.y - 1.3, hs.z - 34);
   const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED), -0.6, 1) * 9;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
@@ -793,6 +878,10 @@ function tick(now) {
   renderer.render(scene, camera);
   $("gd-score").textContent = Math.floor(dist) + " m   ◎ " + rings + "   ☠ " + kills + "   💥 " + bonks;
   $("gd-brake").style.display = state === "play" && brakeNow > 0.25 ? "block" : "none";
+  const nxt = state === "play" ? nextObstacleAhead(heliState.z) : null;
+  const showCue = nxt && !nxt.hit && heliState.z - (nxt.z + nxt.depth / 2) < cruise * 2.4;
+  $("gd-cue").style.display = showCue ? "block" : "none";
+  if (showCue && $("gd-cue").textContent !== nxt.cue) $("gd-cue").textContent = nxt.cue;
   if (showDbg) {
     const n = v => (v >= 0 ? "+" : "") + v.toFixed(2);
     $("gd-debug").textContent = "v" + VERSION + " " + inputMode + " " + (inputMode === "head" ? delegate + " " + fps.toFixed(0) + "fps " + inferMs.toFixed(0) + "ms" : "") + "\n" +
@@ -801,7 +890,7 @@ function tick(now) {
               "face dist " + pose.dist.toFixed(1) + " / " + (neutral.dist || 0).toFixed(1) + "  brake " + brakeNow.toFixed(2) + "\n" : "") +
       "range " + range.yaw.toFixed(3) + " " + range.roll.toFixed(3) + " " + range.pitch.toFixed(3) + "\n" +
       "in x" + n(lastInp.sx) + " y" + n(lastInp.sy) + "  spd " + speed.toFixed(0) + "  curve " + (curve / MAXCURVE).toFixed(2) + "\n" +
-      "mic " + (micOK ? micLevel.toFixed(3) + " / fire at " + micThr.toFixed(3) : "off (tap to fire)");
+      "mic " + (micOK ? micLevel.toFixed(4) + " / fire at " + micThr.toFixed(4) + "\n  bg " + micFloor.toFixed(4) + " game " + outHold.toFixed(4) + " leak " + leak.toFixed(2) + " echo " + (echoCancel ? "on" : "off") : "off (tap to fire)");
   }
   requestAnimationFrame(tick);
 }
@@ -814,18 +903,18 @@ async function makeLandmarker(vision, fileset, which) {
 }
 async function begin(mode) {
   $("gd-go").disabled = true; $("gd-touch").disabled = true;
-  // The audio context has to be created while we're still inside the tap.
-  if (mode === "head" && !FAKE) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; } }
+  initAudio();   // has to happen while we're still inside the tap
   try {
     inputMode = mode;
     if (mode === "head" && !FAKE) {
       statusEl.textContent = "Asking for the camera and microphone…";
       const vid = { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } };
       let stream;
-      try { stream = await navigator.mediaDevices.getUserMedia({ video: vid, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: vid, audio: micConstraints() }); }
       catch (e) { stream = await navigator.mediaDevices.getUserMedia({ video: vid, audio: false }); }   // no mic: tap to fire instead
       video.srcObject = new MediaStream(stream.getVideoTracks()); await video.play();
       setupMic(stream);
+      try { if (navigator.audioSession) navigator.audioSession.type = "play-and-record"; } catch (e) {}
       statusEl.textContent = "Loading face tracker…";
       const vision = await import(MP + "/vision_bundle.mjs");
       const fileset = await vision.FilesetResolver.forVisionTasks(MP + "/wasm");
@@ -839,7 +928,15 @@ async function begin(mode) {
     $("gd-start").style.display = "none";
     $("gd-score").style.display = "block"; $("gd-gear").style.display = "block";
     if (mode === "head") { $("gd-rc").style.display = "block"; showIntro(); }
-    else { state = "play"; flash("GO!", "Drag to steer, tap to fire", 1400); $("gd-bar").style.display = "none"; }
+    else { state = "play"; flash("GO!", "Drag to steer, tap to fire", 1400); $("gd-bar").style.display = "none"; startMusic(); }
+    if (FAKE && audioCtx) {            // test rig: synthetic sounds into the detector, plus simulated speaker-to-mic leak
+      const bus = audioCtx.createGain(); bus.connect(analyser); const lk = audioCtx.createGain(); lk.gain.value = 0; master.connect(lk); lk.connect(analyser);
+      micOK = true;
+      window.gdTest.leak = v => { lk.gain.value = v; }; if (new URLSearchParams(location.search).has('leak')) lk.gain.value = 0.3;
+      window.gdTest.sound = (kind, amp) => { const t = audioCtx.currentTime + 0.02;
+        if (kind === "pew") { tone("sawtooth", 900, 300, t, 0.22, amp, bus); noise(t, 0.04, amp, "highpass", 2000, 2000, 0.7, bus); }
+        else noise(t, 0.5, amp, "lowpass", 300, 300, 0.7, bus); };
+    }
     last = performance.now(); requestAnimationFrame(tick);
   } catch (e) {
     statusEl.textContent = "Couldn't start: " + (e && (e.message || e.name) || e);
@@ -859,10 +956,20 @@ $("gd-steer").addEventListener("click", () => {
 $("gd-feel").addEventListener("click", () => { feel = feel === "fly" ? "direct" : "fly"; $("gd-feel").textContent = "Feel: " + (feel === "fly" ? "Fly" : "Direct"); });
 $("gd-sens").addEventListener("input", e => { sens = parseFloat(e.target.value); });
 $("gd-mic").addEventListener("input", e => { micSens = parseFloat(e.target.value); });
+$("gd-sound").addEventListener("click", () => {
+  soundMode = soundMode === "all" ? "sfx" : soundMode === "sfx" ? "off" : "all";
+  try { localStorage.setItem("gd-sound", soundMode); } catch (e) {}
+  if (audioCtx) applySoundMode(); else $("gd-sound").textContent = "Sound: " + soundMode;
+});
+$("gd-echo").textContent = "Echo cancel: " + (echoCancel ? "On" : "Off");
+$("gd-echo").addEventListener("click", () => {      // changing how the mic is opened needs a fresh start
+  try { localStorage.setItem("gd-echo", echoCancel ? "off" : "on"); } catch (e) {}
+  location.reload();
+});
 $("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
 if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -45 : 300)),
-  get: () => ({ state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, kills, speed, cruise, curve: curve / MAXCURVE, brake: brakeNow,
+  get: () => ({ fires, micLevel, micThr, micFloor, outHold, leak, state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, kills, speed, cruise, curve: curve / MAXCURVE, brake: brakeNow,
     obstacles: obstacles.map(o => o.type), marks: obstacles.reduce((a, o) => a + o.marks, 0),
     enemies: enemies.map(e => e.type + ":" + e.mode + ":" + e.phase + ":" + (e.alive ? "alive" : "dead") + ":" + Math.round(e.z - heliState.z)) }) };
 </script>
