@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.7</title>
+<title>Chopper Run v0.8</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -69,7 +69,7 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.7</div>
+  <div id="gd-ver">v0.8</div>
   <p>Fly a helicopter through the city with your head. Small moves: turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Lean back from the phone to brake. Shout “pew!” (or tap) to fire the laser.</p>
   <p>Uses the front camera and microphone; nothing leaves your phone.</p>
@@ -120,10 +120,10 @@
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.7</div>
+<div id="gd-tag">v0.8</div>
 
 <script type="module">
-const VERSION = "0.7";
+const VERSION = "0.8";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -315,10 +315,10 @@ function flash(text, sub, ms) {
 const SH = 22;                 // half-width of the street canyon
 const XL = SH - 2.4;           // how far the chopper can go sideways
 const FLOOR = 1.6, CEIL = 38;
-const MAXVX = 46, MAXVY = 50;
-const SEG = 26, NSEG = 28, VIEW = 640;
-const BASE_SPEED = 76, TOP_SPEED = 164;
-const MAXCURVE = 0.0018;
+const MAXVX = 60, MAXVY = 60;
+const SEG = 26, NSEG = 46, VIEW = 1100;
+const BASE_SPEED = 228, TOP_SPEED = 492;
+const MAXCURVE = 0.0034, BEND_Z0 = 520;
 let heli, rotor, tailRotor, heliState, speed = 0, cruise = BASE_SPEED, dist = 0, rings = 0, bonks = 0, kills = 0, shake = 0, bumpT = 0, bumpTo = null;
 let buildings = [], dashes = [], obstacles = [], ringObjs = [], enemies = [], nextObsZ = 0, nextChaseAt = 0, prevZ = 0;
 let curve = 0, curveTarget = 0, nextCurveAt = 0, brakeNow = 0;
@@ -330,7 +330,7 @@ function bendable(mat) {
   mat.onBeforeCompile = sh => {
     sh.uniforms.uBend = bendU;
     sh.vertexShader = "uniform vec2 uBend;\n" + sh.vertexShader.replace("#include <project_vertex>",
-      "#include <project_vertex>\n mvPosition.x += uBend.x * mvPosition.z * mvPosition.z;\n mvPosition.y += uBend.y * mvPosition.z * mvPosition.z;\n gl_Position = projectionMatrix * mvPosition;");
+      "#include <project_vertex>\n float bd = -mvPosition.z; float bq = bd < " + BEND_Z0.toFixed(1) + " ? bd * bd : " + BEND_Z0.toFixed(1) + " * (2.0 * bd - " + BEND_Z0.toFixed(1) + ");\n mvPosition.x += uBend.x * bq;\n mvPosition.y += uBend.y * bq;\n gl_Position = projectionMatrix * mvPosition;");
   };
   return mat;
 }
@@ -393,7 +393,7 @@ function makeDragon() {
   for (let i = 0; i < 4; i++) mesh(unitBox, i % 2 ? d : b, 0.6 - i * 0.12, 0.6 - i * 0.12, 1.1, 0, -0.05 * i, 2.6 + i * 1.05, g);
   for (let i = 0; i < 5; i++) { const sp = mesh(M.cone, d, 0.22, 0.6, 0.22, 0, 1.05 - Math.abs(i - 1.5) * 0.12, -1.6 + i * 0.9, g); }
   const wings = addWings(g, M.dragonWing, M.dragonMem, 0.5, -0.4);
-  g.scale.setScalar(1.25);
+  g.scale.setScalar(2.5);
   return { g, wings };
 }
 function makePtero() {
@@ -404,7 +404,7 @@ function makePtero() {
   const crest = mesh(M.cone, M.pteroBeak, 0.16, 1.5, 0.3, 0, 0.75, -1.0, g); crest.rotation.x = Math.PI / 2 - 0.5;
   mesh(unitBox, M.eye, 0.94, 0.12, 0.14, 0, 0.42, -1.85, g);
   const wings = addWings(g, M.pteroWing, M.pteroMem, 0.1, -0.3);
-  g.scale.setScalar(1.3);
+  g.scale.setScalar(2.6);
   return { g, wings };
 }
 function buildWorld() {
@@ -416,13 +416,13 @@ function buildWorld() {
   sg.fillStyle = grad; sg.fillRect(0, 0, 4, 256);
   const sky = new THREE.CanvasTexture(sc); sky.colorSpace = THREE.SRGBColorSpace;
   scene.background = sky;
-  scene.fog = new THREE.Fog(0x8a4a78, 90, VIEW);
+  scene.fog = new THREE.Fog(0x8a4a78, 140, VIEW);
   scene.add(new THREE.HemisphereLight(0xaab4ff, 0x2a1838, 1.5));
   const sun = new THREE.DirectionalLight(0xffb37a, 1.6); sun.position.set(-0.5, 0.8, -1); scene.add(sun);
-  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 950);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.5, 1600);
 
   unitBox = new THREE.BoxGeometry(1, 1, 1);
-  segBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 14);   // long things need extra slices so they follow the curve
+  segBox = new THREE.BoxGeometry(1, 1, 1, 1, 1, 40);   // long things need extra slices so they follow the curve
   M.sphere = new THREE.SphereGeometry(1, 14, 10);
   M.cone = new THREE.ConeGeometry(1, 1, 8);
   M.dark = lam({ color: 0x22262f });
@@ -435,10 +435,10 @@ function buildWorld() {
   M.pteroMem = lam({ color: 0x8a5a3a, emissive: 0x1a0c04, side: THREE.DoubleSide });
   M.pteroWing = wingGeo(5.6, 1.9);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 1700, 1, 90), lam({ color: 0x181b26 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 2800, 1, 140), lam({ color: 0x181b26 }));
   ground.rotation.x = -Math.PI / 2; ground.frustumCulled = false; scene.add(ground); M.ground = ground;
   const dashMat = bas({ color: 0xf2e9b0 });
-  for (let i = 0; i < 46; i++) { const d = mesh(unitBox, dashMat, 0.7, 0.05, 6, 0, 0.03, 40 - i * 16, scene); dashes.push(d); }
+  for (let i = 0; i < 80; i++) { const d = mesh(unitBox, dashMat, 0.7, 0.05, 6, 0, 0.03, 40 - i * 16, scene); dashes.push(d); }
 
   const tints = [0x8f9bd6, 0xb08fd0, 0x7fb0c8, 0xd09a8f, 0x9aa0b4];
   for (let i = 0; i < 5; i++) {
@@ -452,7 +452,7 @@ function buildWorld() {
 
   const h = makeHeli(0xff5a3c, 0x9fe3ff, 0x401008); heli = h.g; rotor = h.rot; tailRotor = h.tail; scene.add(heli);
 
-  ringGeo = new THREE.TorusGeometry(3.4, 0.32, 8, 28);
+  ringGeo = new THREE.TorusGeometry(4.3, 0.4, 8, 28);
   ringMat = bas({ color: 0xffd24a });
   scorchGeo = new THREE.CircleGeometry(1, 10);
   scorchMat = bas({ color: 0x050505, transparent: true, opacity: 0.88, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -484,7 +484,7 @@ function resetRun() {
   for (const o of obstacles) scene.remove(o.group); obstacles = [];
   for (const r of ringObjs) scene.remove(r.m); ringObjs = [];
   for (const e of enemies) scene.remove(e.g); enemies = [];
-  nextObsZ = -260; nextChaseAt = 450; curve = 0; curveTarget = 0; nextCurveAt = 350;
+  nextObsZ = -620; nextChaseAt = 1400; curve = 0; curveTarget = 0; nextCurveAt = 500;
 }
 function burst(x, y, z, n, spread) {
   const k = spread || 1;
@@ -504,7 +504,7 @@ function spawnObstacle(zFront) {
   let types = ["duck", "duck", "duck", "arch", "arch", "arch", "tunnel", "tunnel", "bridge", "tower", "halfwall", "lowwall"];
   if (dist > 500) types = types.concat(["gate", "tunnel", "arch"]);
   const type = pick(types);
-  const depth = type === "tunnel" ? rand(120, 190) : type === "duck" ? 14 : type === "arch" || type === "tower" ? 10 : 7;
+  const depth = type === "tunnel" ? cruise * rand(0.9, 1.5) : type === "duck" ? 34 : type === "arch" || type === "tower" ? 26 : 18;
   const z = zFront - depth / 2;
   const mat = lam({ color: OB_COLORS[type], emissive: OB_COLORS[type], emissiveIntensity: type === "tunnel" ? 0.12 : 0.25, transparent: true });
   const o = { type, group: new THREE.Group(), boxes: [], z, depth, hit: false, mat, safe: { x: 0, y: 14 }, marks: 0 };
@@ -552,12 +552,12 @@ function spawnObstacle(zFront) {
 function spawnEnemy(mode, z) {
   const type = pick(["heli", "dragon", "ptero"]);
   let model;
-  if (type === "heli") { const h = makeHeli(0x5a3f8a, 0xff4455, 0x1a0c30); model = { g: h.g, rot: h.rot, tail: h.tail }; }
+  if (type === "heli") { const h = makeHeli(0x5a3f8a, 0xff4455, 0x1a0c30); h.g.scale.setScalar(2); model = { g: h.g, rot: h.rot, tail: h.tail }; }
   else model = type === "dragon" ? makeDragon() : makePtero();
   const side = pick([-1, 1]);
   const e = { type, mode, ...model, side, x: 0, y: 0, z, t: rand(0, 6), phase: mode === "chase" ? "approach" : "hover", pt: 0, alive: true,
-              bx: rand(-10, 10), by: rand(7, 24), vy: 0, r: type === "dragon" ? 2.6 : 2.1 };
-  if (mode === "chase") { e.x = clamp(heliState.x + side * 10, -XL, XL); e.y = clamp(heliState.y + 3, 5, CEIL - 4); }
+              bx: rand(-9, 9), by: rand(9, 24), vy: 0, r: type === "dragon" ? 4.2 : 3.4 };
+  if (mode === "chase") { e.x = clamp(heliState.x + side * 13, -XL, XL); e.y = clamp(heliState.y + 4, 6, CEIL - 4); }
   else { e.x = e.bx; e.y = e.by; e.g.rotation.y = Math.PI; }     // hoverers face you
   scene.add(e.g); enemies.push(e);
   return e;
@@ -578,19 +578,19 @@ function updateEnemies(dt) {
       let tx = e.x, ty = e.y;
       const rel = e.z - hs.z;              // negative = ahead of you
       if (e.phase === "approach") {
-        e.z -= (speed + 26) * dt; tx = hs.x + e.side * 10; ty = hs.y + 2;
-        if (rel < -6) { e.phase = "beside"; e.pt = 0; }
+        e.z -= (speed * 1.12 + 20) * dt; tx = hs.x + e.side * 13; ty = hs.y + 3;
+        if (rel < -10) { e.phase = "beside"; e.pt = 0; }
       } else if (e.phase === "beside") {
         e.z -= cruise * dt;                // holds cruise speed: brake and it slides ahead of you
-        tx = hs.x + e.side * Math.max(4.6, 9 - e.pt * 0.6); ty = hs.y + Math.sin(e.t * 2) * 1.5;
-        if (rel < -24 || e.pt > 11) { e.phase = "ahead"; e.pt = 0; }
+        tx = hs.x + e.side * Math.max(7.5, 13 - e.pt * 0.8); ty = hs.y + Math.sin(e.t * 2) * 1.5;
+        if (rel < -45 || e.pt > 11) { e.phase = "ahead"; e.pt = 0; }
       } else if (e.phase === "ahead") {
-        e.z -= speed * dt; e.z += ((hs.z - 42) - e.z) * (1 - Math.exp(-dt / 0.5));   // keep pace, then settle 42 ahead
+        e.z -= speed * dt; e.z += ((hs.z - 75) - e.z) * (1 - Math.exp(-dt / 0.5));   // keep pace, then settle 75 ahead
         tx = hs.x * 0.5 + Math.sin(e.t * 1.6) * 7; ty = clamp(hs.y + Math.sin(e.t * 2.3) * 4, 5, CEIL - 4);
         if (e.pt > 7) { e.phase = "leave"; e.pt = 0; }
-      } else { e.z -= (speed + 40) * dt; ty = e.y + 40; }
+      } else { e.z -= speed * 1.3 * dt; ty = e.y + 40; }
       const o = nextObstacleAhead(e.z + 4);
-      if (o && e.phase !== "leave" && e.z - (o.z + o.depth / 2) < 90) { tx = o.safe.x + (e.phase === "beside" ? e.side * 1.5 : 0); ty = o.safe.y; }
+      if (o && e.phase !== "leave" && e.z - (o.z + o.depth / 2) < cruise * 0.9) { tx = o.safe.x + (e.phase === "beside" ? e.side * 1.5 : 0); ty = o.safe.y; }
       const k = 1 - Math.exp(-dt / 0.35);
       e.x = clamp(e.x + (tx - e.x) * k, -XL, XL); e.y = clamp(e.y + (ty - e.y) * k, 3, 90);
       e.g.rotation.z = clamp((tx - e.x) * -0.08, -0.6, 0.6);
@@ -604,11 +604,11 @@ function updateEnemies(dt) {
   }
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e.z > hs.z + 40 || e.y < -6 || e.y > 85) { scene.remove(e.g); enemies.splice(i, 1); }
+    if (e.z > hs.z + 60 || e.y < -8 || e.y > 85) { scene.remove(e.g); enemies.splice(i, 1); }
   }
   if (dist > nextChaseAt && enemies.filter(e => e.mode === "chase" && e.alive).length < 2) {
-    spawnEnemy("chase", hs.z + 30);
-    nextChaseAt = dist + rand(900, 1500);
+    spawnEnemy("chase", hs.z + 45);
+    nextChaseAt = dist + cruise * rand(9, 15);
   }
 }
 function killEnemy(e, byLaser) {
@@ -627,7 +627,7 @@ function fire() {
 function updateLaser(dt) {
   if (laserT <= 0) { laser.visible = false; return; }
   laserT -= dt;
-  const hs = heliState, sx = hs.x, sy = hs.y - 0.2, sz = hs.z - 2.2, RANGE = 320;
+  const hs = heliState, sx = hs.x, sy = hs.y - 0.2, sz = hs.z - 2.2, RANGE = 800;
   // first solid thing straight ahead
   let block = null, blockZ = sz - RANGE;
   for (const o of obstacles) {
@@ -641,7 +641,7 @@ function updateLaser(dt) {
     if (!e.alive) continue;
     const dzz = sz - e.z;
     if (dzz < 2 || dzz > RANGE || e.z < blockZ) continue;
-    if (Math.hypot(e.x - sx, e.y - sy) < 5 + dzz * 0.07 && (!target || e.z > target.z)) target = e;
+    if (Math.hypot(e.x - sx, e.y - sy) < Math.min(7 + dzz * 0.07, 24) && (!target || e.z > target.z)) target = e;
   }
   let ex = sx, ey = sy, ez = blockZ;
   if (target) { ex = target.x; ey = target.y; ez = target.z; killEnemy(target, true); }
@@ -669,19 +669,21 @@ function bonk(o) {
 function update(dt, inp) {
   const hs = heliState;
   brakeNow = inp.brake || 0;
-  cruise = BASE_SPEED + Math.min(1, dist / 2600) * (TOP_SPEED - BASE_SPEED);
+  cruise = BASE_SPEED + Math.min(1, dist / 9000) * (TOP_SPEED - BASE_SPEED);
   const target = cruise * (1 - 0.62 * brakeNow);
   speed += (target - speed) * (1 - Math.exp(-dt / (target < speed ? 0.45 : 1.0)));
   prevZ = hs.z; hs.z -= speed * dt; dist += speed * dt;
 
   // curves
   if (dist > nextCurveAt) {
-    curveTarget = curveTarget !== 0 ? 0 : pick([-1, 1]) * pick([0.0011, 0.0015, MAXCURVE]);
-    nextCurveAt = dist + (curveTarget === 0 ? rand(300, 650) : rand(700, 1400));
+    const was = Math.sign(curveTarget);
+    if (was !== 0 && Math.random() < 0.45) curveTarget = 0;                                   // straighten out
+    else curveTarget = (was !== 0 ? -was : pick([-1, 1])) * pick([0.002, 0.0027, MAXCURVE]);  // new turn, or snap into an S-bend
+    nextCurveAt = dist + cruise * (curveTarget === 0 ? rand(1.2, 2.6) : rand(3.5, 7));
   }
-  curve += (curveTarget - curve) * (1 - Math.exp(-dt / 0.9));
-  bendU.value.set(curve, Math.sin(dist / 900) * 0.0003);
-  const push = -(curve / MAXCURVE) * 12 * (speed / 100);     // a turn throws you toward the outside wall
+  curve += (curveTarget - curve) * (1 - Math.exp(-dt / 0.7));
+  bendU.value.set(curve, Math.sin(dist / 2600) * 0.00022);
+  const push = -(curve / MAXCURVE) * 0.42 * MAXVX * clamp(speed / BASE_SPEED, 0.3, 1);     // a turn throws you toward the outside wall
 
   if (feel === "fly") {
     const k = 1 - Math.exp(-dt / 0.11);
@@ -710,7 +712,7 @@ function update(dt, inp) {
   for (const r of ringObjs) {
     if (!r.done && hs.z < r.z) {
       r.done = true;
-      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 3.7 * 3.7) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
+      if ((hs.x - r.x) ** 2 + (hs.y - r.y) ** 2 < 4.7 * 4.7) { rings++; r.m.visible = false; burst(r.x, r.y, r.z, 14); }
     }
   }
   updateEnemies(dt);
@@ -721,7 +723,7 @@ function update(dt, inp) {
   for (const d of dashes) if (d.position.z > hs.z + 30) d.position.z -= dashes.length * 16;
   while (obstacles.length && obstacles[0].z - obstacles[0].depth / 2 > hs.z + 30) { const o = obstacles.shift(); scene.remove(o.group); o.mat.dispose(); }
   while (ringObjs.length && ringObjs[0].z > hs.z + 30) { scene.remove(ringObjs.shift().m); }
-  const gap = 175 - Math.min(1, dist / 3000) * 50;
+  const gap = cruise * (1.55 - Math.min(1, dist / 12000) * 0.35);   // about a second and a half between obstacles
   while (nextObsZ > hs.z - VIEW - 20) {
     const depth = spawnObstacle(nextObsZ);
     const g = gap * rand(0.85, 1.2);
@@ -738,7 +740,7 @@ function updateVisuals(dt, now) {
   const bank = clamp(hs.vx / MAXVX + cv * 0.45, -1.4, 1.4), climb = clamp(hs.vy / MAXVY, -1.3, 1.3);
   heli.rotation.set(-0.12 + climb * 0.75 + brakeNow * 0.35, -bank * 0.25, -bank * 0.72);
   rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
-  M.ground.position.set(0, 0, hs.z - 500);
+  M.ground.position.set(0, 0, hs.z - 1050);
 
   const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
   if (!camPos) camPos = { x: tx, y: ty };
@@ -746,9 +748,9 @@ function updateVisuals(dt, now) {
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * ky;
   shake *= Math.exp(-dt / 0.18);
   camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
-  const roll = bank * 0.1 + cv * 0.16;                     // lean into the turn
+  const roll = bank * 0.1 + cv * 0.24;                     // lean into the turn
   camera.up.set(Math.sin(roll), Math.cos(roll), 0);
-  camera.lookAt(hs.x * 0.95 + cv * 5, camPos.y - 1.3, hs.z - 34);
+  camera.lookAt(hs.x * 0.95 + cv * 9, camPos.y - 1.3, hs.z - 34);
   const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED), -0.6, 1) * 9;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
@@ -859,7 +861,7 @@ $("gd-sens").addEventListener("input", e => { sens = parseFloat(e.target.value);
 $("gd-mic").addEventListener("input", e => { micSens = parseFloat(e.target.value); });
 $("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
-if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -30 : 120)),
+if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -45 : 300)),
   get: () => ({ state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, kills, speed, cruise, curve: curve / MAXCURVE, brake: brakeNow,
     obstacles: obstacles.map(o => o.type), marks: obstacles.reduce((a, o) => a + o.marks, 0),
     enemies: enemies.map(e => e.type + ":" + e.mode + ":" + e.phase + ":" + (e.alive ? "alive" : "dead") + ":" + Math.round(e.z - heliState.z)) }) };
