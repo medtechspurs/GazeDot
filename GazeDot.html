@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.4</title>
+<title>Chopper Run v0.5</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -65,7 +65,7 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.4</div>
+  <div id="gd-ver">v0.5</div>
   <p>Fly a helicopter through the city with your head. Turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Fly through the gold rings. Hitting things just bounces you. Uses the front camera; nothing leaves your phone.</p>
   <button id="gd-go">Start</button>
@@ -106,7 +106,7 @@
       <path class="gd-arr" d="M86 52 L86 20"/><path class="gd-arr" d="M79 29 L86 19 L93 29"/>
     </svg><b>4. Chin up</b><span></span></div>
   </div>
-  <p>Small, comfortable movements are plenty.</p>
+  <p>Keep the movements small. The game responds to subtle moves.</p>
   <button id="gd-calgo">Start calibration</button>
 </div>
 
@@ -116,16 +116,16 @@
   <button id="gd-recenter">Recenter</button>
   <button id="gd-steer">Steer: Both</button>
   <button id="gd-feel">Feel: Fly</button>
-  <label>Sens <input id="gd-sens" type="range" min="0.5" max="2.2" step="0.05" value="1"></label>
+  <label>Sens <input id="gd-sens" type="range" min="0.4" max="3" step="0.05" value="1"></label>
   <button id="gd-recal">Recalibrate</button>
   <button id="gd-dbgbtn">Debug</button>
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.4</div>
+<div id="gd-tag">v0.5</div>
 
 <script type="module">
-const VERSION = "0.4";
+const VERSION = "0.5";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -153,6 +153,9 @@ let neutral = { yaw: 0, pitch: 0, roll: 0 };
 // Which way each angle runs. These defaults are a best guess; calibration overrides them.
 let signs = { yaw: -1, roll: 1, pitch: -1 };
 let haveSigns = false;
+// Head angle (radians) that gives full deflection. Small on purpose: subtle moves, big effect.
+const BASE_RANGE = { yaw: 0.11, roll: 0.11, pitch: 0.055 };
+let range = { ...BASE_RANGE };
 try { const s = JSON.parse(localStorage.getItem("gd-signs") || "null"); if (s && s.yaw && s.roll && s.pitch) { signs = s; haveSigns = true; } } catch (e) {}
 
 function readPose(res) {
@@ -182,13 +185,13 @@ function infer(now) {
   if (!pose) pose = { ...p };
   else { const k = 0.45; pose.yaw += (p.yaw - pose.yaw) * k; pose.pitch += (p.pitch - pose.pitch) * k; pose.roll += (p.roll - pose.roll) * k; }
 }
-const dz = v => { const a = Math.abs(v), d = 0.08; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
+const dz = v => { const a = Math.abs(v), d = 0.06; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
 let parts = { t: 0, r: 0, p: 0 };
 function headInput(now) {
   if (!pose || now - lastSeenAt > 500) return { sx: 0, sy: 0 };
-  const t = signs.yaw * (pose.yaw - neutral.yaw) / 0.24 * sens;      // about 14 degrees of turn = full bank
-  const r = signs.roll * (pose.roll - neutral.roll) / 0.24 * sens;   // about 14 degrees of tilt = full bank
-  const p = signs.pitch * (pose.pitch - neutral.pitch) / 0.16 * sens; // about 9 degrees of nod = full climb
+  const t = signs.yaw * (pose.yaw - neutral.yaw) / range.yaw * sens;      // about 6 degrees of turn = full bank
+  const r = signs.roll * (pose.roll - neutral.roll) / range.roll * sens;   // about 6 degrees of tilt = full bank
+  const p = signs.pitch * (pose.pitch - neutral.pitch) / range.pitch * sens; // about 3 degrees of nod = full climb
   parts = { t, r, p };
   const s = steerMode === "turn" ? t : steerMode === "tilt" ? r : t + r;
   return { sx: clamp(dz(s), -1, 1), sy: clamp(dz(p), -1, 1) };
@@ -203,6 +206,12 @@ function pointer(e) {
   touchIn = { sx: clamp((e.clientX - W / 2) / (W * 0.35), -1, 1), sy: clamp(-(e.clientY - H / 2) / (H * 0.28), -1, 1) };
 }
 ["pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(t => $("gd-canvas").addEventListener(t, pointer));
+let lastTap = 0;
+$("gd-canvas").addEventListener("pointerdown", () => {
+  const now = performance.now();
+  if (now - lastTap < 350 && state === "play" && inputMode === "head" && raw) { neutral = { ...raw }; flash("Recentered", "", 600); }
+  lastTap = now;
+});
 window.addEventListener("keydown", e => { keys[e.key] = true; });
 window.addEventListener("keyup", e => { keys[e.key] = false; });
 function touchInput() {
@@ -243,6 +252,8 @@ function stepCal(now) {
       if (Math.abs(dy) > 0.05) signs.yaw = -Math.sign(dy);     // head left must steer left (negative)
       if (Math.abs(dr) > 0.05) signs.roll = -Math.sign(dr);
       if (Math.abs(dp) > 0.04) signs.pitch = Math.sign(dp);    // chin up must climb (positive)
+      range = { yaw: clamp(Math.abs(dy) * 0.6, 0.05, BASE_RANGE.yaw), roll: clamp(Math.abs(dr) * 0.6, 0.05, BASE_RANGE.roll),
+                pitch: clamp(Math.abs(dp) * 0.6, 0.025, BASE_RANGE.pitch) };
       haveSigns = true;
       try { localStorage.setItem("gd-signs", JSON.stringify(signs)); } catch (e) {}
     }
@@ -542,7 +553,7 @@ function tick(now) {
     $("gd-debug").textContent = "v" + VERSION + " " + inputMode + " " + (inputMode === "head" ? delegate + " " + fps.toFixed(0) + "fps " + inferMs.toFixed(0) + "ms" : "") + "\n" +
       (pose ? "yaw" + n(pose.yaw) + " roll" + n(pose.roll) + " pitch" + n(pose.pitch) + "\n" +
               "turn" + n(parts.t) + " tilt" + n(parts.r) + " nod" + n(parts.p) + "\n" : "") +
-      "signs " + signs.yaw + " " + signs.roll + " " + signs.pitch + "\n" +
+      "signs " + signs.yaw + " " + signs.roll + " " + signs.pitch + "  range " + range.yaw.toFixed(2) + " " + range.roll.toFixed(2) + " " + range.pitch.toFixed(3) + "\n" +
       "in x" + n(lastInp.sx) + " y" + n(lastInp.sy) + "  spd " + speed.toFixed(0);
   }
   requestAnimationFrame(tick);
@@ -596,7 +607,7 @@ $("gd-feel").addEventListener("click", () => { feel = feel === "fly" ? "direct" 
 $("gd-sens").addEventListener("input", e => { sens = parseFloat(e.target.value); });
 $("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
-if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, get: () => ({ state, signs, neutral, lastInp, heliState, dist, rings, bonks, speed, obstacles: obstacles.length }) };
+if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, get: () => ({ state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, speed, obstacles: obstacles.length }) };
 </script>
 </body>
 </html>
