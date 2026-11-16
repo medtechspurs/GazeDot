@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.11</title>
+<title>Chopper Run v0.12</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -26,7 +26,7 @@
   #gd-score { position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 0; right: 0; text-align: center;
     font-size: 16px; font-weight: 700; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none;
     font-variant-numeric: tabular-nums; }
-  #gd-cue { position: fixed; left: 0; right: 0; top: 16%; text-align: center; font-size: 96px; line-height: 1; font-weight: 900;
+  #gd-cue { position: fixed; left: 0; right: 0; top: 41%; opacity: 0.8; text-align: center; font-size: 96px; line-height: 1; font-weight: 900;
     color: #ffd24a; text-shadow: 0 2px 14px #000, 0 0 4px #000; z-index: 3; pointer-events: none; display: none; }
   #gd-brake { position: fixed; left: 0; right: 0; bottom: 22%; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: 3px;
     color: #ffcf7f; text-shadow: 0 1px 6px #000; z-index: 3; pointer-events: none; display: none; }
@@ -71,7 +71,7 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.11</div>
+  <div id="gd-ver">v0.12</div>
   <p>Fly a helicopter through the city with your head. Small moves: turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Every gap is at an edge or a corner. Follow the big arrow and slam the chopper there. Lean back to brake. Shout “pew!” (or tap) to fire.</p>
   <p>Sound on for music. Uses the front camera and microphone; nothing leaves your phone.</p>
@@ -125,10 +125,10 @@
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.11</div>
+<div id="gd-tag">v0.12</div>
 
 <script type="module">
-const VERSION = "0.11";
+const VERSION = "0.12";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -240,6 +240,7 @@ function touchInput() {
 }
 
 /* ---------------- audio: output buses, "pew" detector, music, sound effects ---------------- */
+let crunchBus = null;
 let audioCtx = null, master = null, musicBus = null, sfxBus = null, echoBus = null, outAn = null, outBuf = null, noiseBuf = null;
 let analyser = null, micBuf = null, micStream = null, micFloor = 0, micLevel = 0, micThr = 0, lastPew = 0, micSens = 1, micOK = false,
     micWasOver = false, outHold = 0, leak = 0.15, micLearnUntil = 0, micMuteUntil = 0, fires = 0;
@@ -255,6 +256,10 @@ function initAudio() {
   const dl = c.createDelay(1), fb = c.createGain(), wet = c.createGain();      // tempo echo for stabs and lead
   dl.delayTime.value = STEP * 3; fb.gain.value = 0.38; wet.gain.value = 0.3;
   echoBus = c.createGain(); echoBus.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(musicBus);
+  const shaper = c.createWaveShaper(), curve = new Float32Array(1024);      // crunch: hard clip quantised to a few steps
+  for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.round(Math.tanh(x * 7) * 5) / 5; }
+  shaper.curve = curve; crunchBus = c.createGain(); crunchBus.gain.value = 1; crunchBus.connect(shaper);
+  const crunchOut = c.createGain(); crunchOut.gain.value = 0.75; shaper.connect(crunchOut); crunchOut.connect(sfxBus);
   outAn = c.createAnalyser(); outAn.fftSize = 1024; outAn.smoothingTimeConstant = 0; master.connect(outAn);
   outBuf = new Float32Array(outAn.frequencyBinCount);
   noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
@@ -347,7 +352,11 @@ const sfx = {
   laser() { const t = audioCtx.currentTime; tone("sawtooth", 2400, 160, t, 0.25, 0.3, sfxBus); tone("square", 1800, 120, t, 0.22, 0.12, sfxBus, 14); },
   bonk() { const t = audioCtx.currentTime; noise(t, 0.3, 0.6, "lowpass", 1200, 200, 0.7, sfxBus); tone("sine", 120, 38, t, 0.3, 0.7, sfxBus); },
   ring() { const t = audioCtx.currentTime; tone("triangle", 1047, 1047, t, 0.09, 0.22, sfxBus); tone("triangle", 1568, 1568, t + 0.07, 0.16, 0.22, sfxBus); },
-  kill() { const t = audioCtx.currentTime; noise(t, 0.5, 0.5, "bandpass", 2200, 180, 0.9, sfxBus); tone("sawtooth", 420, 50, t, 0.5, 0.3, sfxBus, 0, 1800); },
+  kill() { const t = audioCtx.currentTime;
+    noise(t, 0.34, 1.0, "lowpass", 6000, 260, 0.9, crunchBus);          // the blast
+    tone("square", 150, 32, t, 0.3, 0.8, crunchBus);                     // the thump
+    tone("sawtooth", 3200, 180, t, 0.09, 0.45, crunchBus);               // the zap on impact
+    noise(t + 0.05, 0.5, 0.3, "bandpass", 900, 200, 0.6, sfxBus); },     // the tail
   whoosh() { const t = audioCtx.currentTime; noise(t, 0.2, 0.16, "bandpass", 500, 1900, 1.2, sfxBus); },
   beep(f, d) { const t = audioCtx.currentTime; tone("square", f, f, t, d || 0.09, 0.16, sfxBus, 0, 3000); },
 };
@@ -431,6 +440,8 @@ let heli, rotor, tailRotor, heliState, speed = 0, cruise = BASE_SPEED, dist = 0,
 let buildings = [], dashes = [], obstacles = [], ringObjs = [], enemies = [], nextObsZ = 0, nextChaseAt = 0, prevZ = 0;
 let curve = 0, curveTarget = 0, nextCurveAt = 0, brakeNow = 0;
 let unitBox, segBox, bldMats = [], ringGeo, ringMat, sparkGeo, sparks = [], sparkPts, sparkNext = 0, bendU, M = {};
+const LASER_SEGS = 14;
+let debris = [], fx = [];
 let laser = null, laserT = 0, scorchGeo, scorchMat, lastScorch = { x: 99, y: 99, o: null };
 
 // Arcade-racer curves: the whole world bends sideways with distance from the camera, in the vertex shader.
@@ -566,12 +577,22 @@ function buildWorld() {
   scorchMat = bas({ color: 0x050505, transparent: true, opacity: 0.88, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
   // laser beam: a unit-length bar pointing along +z from its origin, aimed with lookAt
-  const beamGeo = new THREE.BoxGeometry(1, 1, 1, 1, 1, 20); beamGeo.translate(0, 0, 0.5);
+  const beamGeo = new THREE.BoxGeometry(1, 1, 1); beamGeo.translate(0, 0, 0.5);
   laser = new THREE.Group();
-  const core = new THREE.Mesh(beamGeo, bas({ color: 0xff2020, fog: false })); core.scale.set(0.22, 0.22, 1); core.frustumCulled = false;
-  const glow = new THREE.Mesh(beamGeo, bas({ color: 0xff5040, fog: false, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
-  glow.scale.set(0.8, 0.8, 1); glow.frustumCulled = false;
-  laser.add(core, glow); laser.visible = false; scene.add(laser);
+  const coreMat = bas({ color: 0xff2020, fog: false }), glowMat = bas({ color: 0xff5040, fog: false, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (let i = 0; i < LASER_SEGS; i++) {
+    const core = new THREE.Mesh(beamGeo, coreMat), glow = new THREE.Mesh(beamGeo, glowMat);
+    core.frustumCulled = glow.frustumCulled = false; laser.add(core, glow);
+  }
+  laser.visible = false; scene.add(laser);
+  // explosion textures
+  const radial = stops => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); for (const [o, col] of stops) gr.addColorStop(o, col);
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  M.fireTex = radial([[0, "rgba(255,255,255,1)"], [0.2, "rgba(255,240,150,1)"], [0.45, "rgba(255,140,30,0.9)"], [0.75, "rgba(220,40,10,0.45)"], [1, "rgba(120,0,0,0)"]]);
+  M.flashTex = radial([[0, "rgba(255,255,255,1)"], [0.4, "rgba(255,230,200,0.6)"], [1, "rgba(255,200,150,0)"]]);
+  M.ringTex = radial([[0, "rgba(255,255,255,0)"], [0.72, "rgba(255,200,120,0)"], [0.86, "rgba(255,230,180,1)"], [1, "rgba(255,120,40,0)"]]);
+  M.fxGeo = new THREE.PlaneGeometry(1, 1);
 
   const N = 180, pos = new Float32Array(N * 3).fill(-999);
   sparkGeo = new THREE.BufferGeometry(); sparkGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -592,6 +613,7 @@ function resetRun() {
   for (const o of obstacles) scene.remove(o.group); obstacles = [];
   for (const r of ringObjs) scene.remove(r.m); ringObjs = [];
   for (const e of enemies) scene.remove(e.g); enemies = [];
+  for (const d of debris) scene.remove(d.m); debris = []; for (const f of fx) scene.remove(f.m); fx = [];
   nextObsZ = -950; nextChaseAt = 2200; curve = 0; curveTarget = 0; nextCurveAt = 800; lastRegions = [];
 }
 function burst(x, y, z, n, spread) {
@@ -699,18 +721,56 @@ function updateEnemies(dt) {
   }
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e.z > hs.z + 60 || e.y < -8 || e.y > 85) { scene.remove(e.g); enemies.splice(i, 1); }
+    if (e.gone || e.z > hs.z + 60 || e.y < -8 || e.y > 85) { scene.remove(e.g); enemies.splice(i, 1); }
   }
   if (dist > nextChaseAt && enemies.filter(e => e.mode === "chase" && e.alive).length < 2) {
     spawnEnemy("chase", hs.z + 45);
     nextChaseAt = dist + cruise * rand(9, 15);
   }
 }
+function addFx(tex, e, s0, s1, dur, color) {
+  const mat = bas({ map: tex, color: color || 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const m = new THREE.Mesh(M.fxGeo, mat); m.frustumCulled = false; m.renderOrder = 5; scene.add(m);
+  fx.push({ m, x: e.x, y: e.y, rz: e.z - heliState.z, t: 0, dur, s0, s1 });
+}
+function explode(e) {
+  // the enemy comes apart: every piece of its model becomes a tumbling fragment
+  e.g.updateMatrixWorld(true);
+  const pieces = []; e.g.traverse(o => { if (o.isMesh) pieces.push(o); });
+  for (const m of pieces) {
+    scene.attach(m);
+    debris.push({ m, rz: m.position.z - heliState.z, vx: rand(-30, 30), vy: rand(-8, 34), vz: rand(-34, 34),
+                  rx: rand(-14, 14), ry: rand(-14, 14), rr: rand(-14, 14), life: rand(0.7, 1.2), s: m.scale.clone() });
+  }
+  addFx(M.flashTex, e, 16, 64, 0.14);
+  addFx(M.fireTex, e, 7, 46, 0.5);
+  addFx(M.fireTex, e, 4, 26, 0.7, 0xffb060);
+  addFx(M.ringTex, e, 6, 84, 0.5);
+  burst(e.x, e.y, e.z, 60, 2.2);
+  shake = Math.max(shake, 0.5);
+}
+function updateFx(dt) {
+  const hz = heliState.z;
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const f = fx[i]; f.t += dt; const k = f.t / f.dur;
+    if (k >= 1) { scene.remove(f.m); f.m.material.dispose(); fx.splice(i, 1); continue; }
+    const sc = f.s0 + (f.s1 - f.s0) * (1 - (1 - k) * (1 - k));
+    f.m.position.set(f.x, f.y, hz + f.rz); f.m.quaternion.copy(camera.quaternion); f.m.scale.set(sc, sc, 1); f.m.material.opacity = 1 - k * k;
+  }
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i]; d.life -= dt;
+    if (d.life <= 0) { scene.remove(d.m); debris.splice(i, 1); continue; }
+    d.vy -= 55 * dt; d.rz += d.vz * dt;
+    d.m.position.x += d.vx * dt; d.m.position.y += d.vy * dt; d.m.position.z = hz + d.rz;
+    d.m.rotation.x += d.rx * dt; d.m.rotation.y += d.ry * dt; d.m.rotation.z += d.rr * dt;
+    if (d.life < 0.3) d.m.scale.copy(d.s).multiplyScalar(d.life / 0.3);
+  }
+}
 function killEnemy(e, byLaser) {
   if (!e.alive) return;
-  e.alive = false; e.vy = 9;
-  burst(e.x, e.y, e.z, 30, 1.4);
-  if (byLaser) { kills++; flash("ZAP!", "", 350); play("kill"); }
+  e.alive = false; e.gone = true;
+  explode(e); play("kill");
+  if (byLaser) { kills++; flash("ZAP!", "", 350); }
 }
 
 /* ---------------- laser ---------------- */
@@ -748,10 +808,16 @@ function updateLaser(dt) {
     }
     burst(sx, sy, blockZ + 0.5, 2, 0.5);
   }
+  // Draw the beam as a curve: it leaves the nose straight ahead, then bends in to whatever it locked onto.
   laser.visible = true;
-  laser.position.set(sx, sy, sz); laser.lookAt(ex, ey, ez);
-  const len = Math.hypot(ex - sx, ey - sy, ez - sz);
-  laser.children[0].scale.z = len; laser.children[1].scale.z = len;
+  const cz = sz + (ez - sz) * 0.55;                       // control point: straight ahead of the nose
+  const pt = t => { const a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t; return [a * sx + b * sx + c * ex, a * sy + b * sy + c * ey, a * sz + b * cz + c * ez]; };
+  let prev = pt(0);
+  for (let i = 0; i < LASER_SEGS; i++) {
+    const nx = pt((i + 1) / LASER_SEGS), len = Math.hypot(nx[0] - prev[0], nx[1] - prev[1], nx[2] - prev[2]);
+    for (let k = 0; k < 2; k++) { const m = laser.children[i * 2 + k], w = k ? 0.85 : 0.24; m.position.set(prev[0], prev[1], prev[2]); m.lookAt(nx[0], nx[1], nx[2]); m.scale.set(w, w, len); }
+    prev = nx;
+  }
 }
 
 function bonk(o) {
@@ -838,7 +904,8 @@ function updateVisuals(dt, now) {
   rotor.rotation.y += dt * 38; tailRotor.rotation.x += dt * 50;
   M.ground.position.set(0, 0, hs.z - 1500);
 
-  const tx = hs.x * 0.9, ty = hs.y + 3.2, tz = hs.z + 12.5;
+  const MIDY = (FLOOR + CEIL) / 2;
+  const tx = hs.x * 0.9, ty = MIDY + (hs.y - MIDY) * 0.56, tz = hs.z + 12.5;   // camera follows only half your altitude
   if (!camPos) camPos = { x: tx, y: ty };
   const k = 1 - Math.exp(-dt / 0.12), ky = 1 - Math.exp(-dt / 0.16);
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * ky;
@@ -846,10 +913,11 @@ function updateVisuals(dt, now) {
   camera.position.set(camPos.x + rand(-1, 1) * shake * 0.6, camPos.y + rand(-1, 1) * shake * 0.6, tz);
   const roll = bank * 0.1 + cv * 0.24;                     // lean into the turn
   camera.up.set(Math.sin(roll), Math.cos(roll), 0);
-  camera.lookAt(hs.x * 0.95, camPos.y - 1.3, hs.z - 34);
+  camera.lookAt(hs.x * 0.95, camPos.y - 0.4, hs.z - 34);
   const baseFov = W < H ? 84 : 62, fov = baseFov + clamp((speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED), -0.6, 1) * 9;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   for (const r of ringObjs) r.m.rotation.z += dt * 1.2;
+  updateFx(dt);
 
   const pos = sparkGeo.attributes.position.array;
   for (let i = 0; i < sparks.length; i++) {
