@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Chopper Run v0.10</title>
+<title>Chopper Run v0.11</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0d12; color: #e8ecf4; overflow: hidden;
     font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none;
@@ -71,7 +71,7 @@
 
 <div id="gd-start">
   <h1>Chopper Run</h1>
-  <div id="gd-ver">v0.10</div>
+  <div id="gd-ver">v0.11</div>
   <p>Fly a helicopter through the city with your head. Small moves: turn or tilt to bank, chin up to climb, chin down to dive.</p>
   <p>Every gap is at an edge or a corner. Follow the big arrow and slam the chopper there. Lean back to brake. Shout “pew!” (or tap) to fire.</p>
   <p>Sound on for music. Uses the front camera and microphone; nothing leaves your phone.</p>
@@ -125,10 +125,10 @@
 </div>
 <div id="gd-msg"><span id="gd-msgtext"></span><small id="gd-msgsub"></small><div id="gd-bar"><div id="gd-barfill"></div></div></div>
 <div id="gd-debug"></div>
-<div id="gd-tag">v0.10</div>
+<div id="gd-tag">v0.11</div>
 
 <script type="module">
-const VERSION = "0.10";
+const VERSION = "0.11";
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3";
 const MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -196,16 +196,27 @@ function infer(now) {
 }
 const dz = v => { const a = Math.abs(v), d = 0.06; return a < d ? 0 : Math.sign(v) * (a - d) / (1 - d); };
 let parts = { t: 0, r: 0, p: 0 };
+let upHold = 0, upPeakAt = -1e9, upLastT = 0;
 function headInput(now) {
   if (!pose || now - lastSeenAt > 500) return { sx: 0, sy: 0, brake: 0 };
   const t = signs.yaw * (pose.yaw - neutral.yaw) / range.yaw * sens;
   const r = signs.roll * (pose.roll - neutral.roll) / range.roll * sens;
-  const p = signs.pitch * (pose.pitch - neutral.pitch) / range.pitch * sens;
+  let p = signs.pitch * (pose.pitch - neutral.pitch) / range.pitch * sens;
+  if (p > 0) p *= 1.7;                 // chin-up is the awkward direction with a phone held below your face: make it count for more
   parts = { t, r, p };
   const s = steerMode === "turn" ? t : steerMode === "tilt" ? r : t + r;
   // Face farther from the camera than it was at calibration = brake.
   const brake = neutral.dist > 0 ? clamp((pose.dist / neutral.dist - 1.07) / 0.15, 0, 1) : 0;
-  return { sx: clamp(dz(s), -1, 1), sy: clamp(dz(p), -1, 1), brake };
+  // Climb latch. A chin-up is hard to hold while still watching the screen, and coming back from it tends to dip below
+  // neutral. So an upward nudge keeps climbing for about a second on its own, and the small dip on the way back is ignored.
+  // A firm chin-down cancels it straight away.
+  let sy = clamp(dz(p), -1, 1);
+  const dts = Math.min(0.1, (now - upLastT) / 1000); upLastT = now;
+  if (sy > upHold) { upHold = sy; upPeakAt = now; }
+  else if (now - upPeakAt > 450) upHold = Math.max(0, upHold - 2.2 * dts);
+  if (sy >= 0) sy = Math.max(sy, upHold);
+  else if (now - upPeakAt < 1100) { if (sy > -0.75) sy = upHold; else { upHold = 0; upPeakAt = -1e9; } }
+  return { sx: clamp(dz(s), -1, 1), sy, brake };
 }
 function recenter() { if (raw) { neutral = { ...raw }; if (pose) pose.dist = raw.dist; flash("Recentered", "", 600); } }
 
@@ -968,7 +979,7 @@ $("gd-echo").addEventListener("click", () => {      // changing how the mic is o
 });
 $("gd-dbgbtn").addEventListener("click", () => { showDbg = !showDbg; $("gd-debug").style.display = showDbg ? "block" : "none"; video.classList.toggle("gd-show", showDbg); });
 
-if (FAKE) window.gdTest = { setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -45 : 300)),
+if (FAKE) window.gdTest = { noObstacles: () => { for (const o of obstacles) scene.remove(o.group); obstacles = []; nextObsZ = -1e15; }, setPose: p => { fakePose = p; }, fire, spawn: (m) => spawnEnemy(m, heliState.z - (m === "chase" ? -45 : 300)),
   get: () => ({ fires, micLevel, micThr, micFloor, outHold, leak, state, signs, range, neutral, lastInp, heliState, dist, rings, bonks, kills, speed, cruise, curve: curve / MAXCURVE, brake: brakeNow,
     obstacles: obstacles.map(o => o.type), marks: obstacles.reduce((a, o) => a + o.marks, 0),
     enemies: enemies.map(e => e.type + ":" + e.mode + ":" + e.phase + ":" + (e.alive ? "alive" : "dead") + ":" + Math.round(e.z - heliState.z)) }) };
